@@ -17,13 +17,11 @@
 go test ./...
 
 # Integration tests — requires a real Notion workspace:
-export NODIN_TEST_TOKEN="secret_..."
-export NODIN_TEST_PAGE_ID="<uuid of a page nodin can write under>"
-go test -tags integration ./...
+source .env   # see .env.example
+go test -tags integration ./internal/sync/ ./internal/notion/
 ```
 
-Integration tests create and clean up their own pages under `NODIN_TEST_PAGE_ID`,
-prefixed `nodin-test-`. They are safe to run repeatedly.
+Copy `.env.example` to `.env` and fill in `NODIN_TEST_TOKEN` (a Notion integration token) and `NODIN_TEST_PAGE_ID` (a page the token can write under). Integration tests create and clean up their own pages prefixed `nodin-test-` and are safe to run repeatedly.
 
 ## Coding conventions
 

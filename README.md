@@ -65,12 +65,18 @@ download_assets = true       # download images and files locally
 ## Development
 
 ```sh
-go test ./...                                        # unit tests, no network needed
-go test -tags integration ./internal/sync/ ./internal/notion/   # needs NODIN_TEST_TOKEN + NODIN_TEST_PAGE_ID
+go test ./...        # unit tests, no network needed
 go build -o nodin ./cmd/nodin
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a new block type.
+For integration tests, copy `.env.example` to `.env`, fill in your token and a test page ID, then:
+
+```sh
+source .env
+go test -tags integration ./internal/sync/ ./internal/notion/
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 
 ## License
 
