@@ -91,7 +91,7 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		}
 
 		g.Go(func() error {
-			if err := pushPage(ctx, store, client, opts, id, entry, localContent, report); err != nil {
+			if err := pushPage(ctx, cfg.SyncDir, store, client, opts, id, entry, localContent, report); err != nil {
 				return fmt.Errorf("push page %s: %w", id, err)
 			}
 			return nil
@@ -111,6 +111,7 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 
 func pushPage(
 	ctx context.Context,
+	syncDir string,
 	store *state.Store,
 	client *notion.Client,
 	opts convert.PullOptions,
@@ -149,10 +150,10 @@ func pushPage(
 		if mergeErr != nil {
 			// git unavailable; use local content as-is and risk overwriting remote changes.
 		} else if result.Conflicts {
-			absPath := filepath.Join("", entry.LocalPath) // caller has no SyncDir ref here
-			_ = absPath
-			// Write conflict markers back to the local file via the report mechanism.
-			// The orchestrator can't write files from here without cfg; surface as Skipped+Conflict.
+			absPath := filepath.Join(syncDir, entry.LocalPath)
+			if err := writeFileAtomic(absPath, result.Content); err != nil {
+				return fmt.Errorf("write conflict markers: %w", err)
+			}
 			report.mu.Lock()
 			report.Conflicts++
 			report.mu.Unlock()
