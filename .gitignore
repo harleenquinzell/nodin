@@ -1,0 +1,13 @@
+# binaries
+nodin
+dist/
+
+# test artifacts
+*.test
+*.out
+
+# environment
+.env
+
+# Go
+vendor/
