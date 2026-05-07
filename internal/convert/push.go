@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -19,14 +20,39 @@ func PushPage(rawMarkdown string) (notion.Page, []notion.Block, error) {
 	if err != nil {
 		return notion.Page{}, nil, fmt.Errorf("push: parse frontmatter: %w", err)
 	}
-	_ = fm
 
 	blocks, err := parseMarkdownBlocks(body)
 	if err != nil {
 		return notion.Page{}, nil, fmt.Errorf("push: parse blocks: %w", err)
 	}
 
-	return notion.Page{}, blocks, nil
+	page := buildPageFromFrontmatter(fm)
+	return page, blocks, nil
+}
+
+// buildPageFromFrontmatter constructs a notion.Page from parsed frontmatter.
+// Only the title property is populated; other fields are set by the Notion API.
+func buildPageFromFrontmatter(fm Frontmatter) notion.Page {
+	if fm.Title == "" {
+		return notion.Page{}
+	}
+	titleRaw, _ := json.Marshal(map[string]any{
+		"type": "title",
+		"title": []map[string]any{{
+			"type":       "text",
+			"plain_text": fm.Title,
+			"text":       map[string]any{"content": fm.Title, "link": nil},
+			"annotations": map[string]bool{
+				"bold": false, "italic": false,
+				"strikethrough": false, "underline": false, "code": false,
+			},
+		}},
+	})
+	return notion.Page{
+		Properties: map[string]json.RawMessage{
+			"title": json.RawMessage(titleRaw),
+		},
+	}
 }
 
 // parseMarkdownBlocks parses a markdown body string into a slice of Notion blocks.

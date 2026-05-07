@@ -11,6 +11,105 @@ import (
 	"github.com/harleenquinzell/nodin/internal/notion"
 )
 
+// makeRawProp encodes a Notion property value envelope as json.RawMessage.
+func makeRawProp(typ string, payload map[string]any) json.RawMessage {
+	envelope := map[string]any{"type": typ, "id": "abc"}
+	for k, v := range payload {
+		envelope[k] = v
+	}
+	data, _ := json.Marshal(envelope)
+	return data
+}
+
+func TestPullDatabaseEntry(t *testing.T) {
+	page := notion.Page{
+		ID: "page-1",
+		Parent: notion.Parent{
+			Type:       "database_id",
+			DatabaseID: "db-1",
+		},
+		Properties: map[string]json.RawMessage{
+			"Name": makeRawProp("title", map[string]any{
+				"title": []map[string]any{{
+					"type":       "text",
+					"plain_text": "My Entry",
+					"text":       map[string]any{"content": "My Entry"},
+					"annotations": map[string]bool{
+						"bold": false, "italic": false,
+						"strikethrough": false, "underline": false, "code": false,
+					},
+				}},
+			}),
+			"Status": makeRawProp("select", map[string]any{
+				"select": map[string]any{"name": "In Progress"},
+			}),
+			"Priority": makeRawProp("number", map[string]any{
+				"number": 3.0,
+			}),
+			"Done": makeRawProp("checkbox", map[string]any{
+				"checkbox": true,
+			}),
+		},
+	}
+
+	opts := convert.PullOptions{}
+	cp, err := convert.PullPage(page, nil, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Title must appear in frontmatter.
+	if !strings.Contains(cp.Frontmatter, "title: My Entry") {
+		t.Errorf("frontmatter missing title, got:\n%s", cp.Frontmatter)
+	}
+
+	// Non-title properties must appear under properties: section.
+	if !strings.Contains(cp.Frontmatter, "properties:") {
+		t.Errorf("frontmatter missing properties: section, got:\n%s", cp.Frontmatter)
+	}
+
+	for _, want := range []string{"Status", "Priority", "Done"} {
+		if !strings.Contains(cp.Frontmatter, want) {
+			t.Errorf("frontmatter missing property %q, got:\n%s", want, cp.Frontmatter)
+		}
+	}
+
+	// Title property must NOT appear in properties: section.
+	// (It is always skipped during iteration in PullPage.)
+	if strings.Contains(cp.Frontmatter, "Name:") {
+		t.Errorf("title property 'Name' should not appear under properties:, got:\n%s", cp.Frontmatter)
+	}
+}
+
+func TestPushPageTitle(t *testing.T) {
+	md := "---\ntitle: Hello World\n---\n\nSome paragraph.\n"
+
+	page, _, err := convert.PushPage(md)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := page.Title(); got != "Hello World" {
+		t.Errorf("page.Title() = %q, want %q", got, "Hello World")
+	}
+}
+
+func TestPushPageNoTitle(t *testing.T) {
+	md := "Just a body with no frontmatter.\n"
+
+	page, blocks, err := convert.PushPage(md)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := page.Title(); got != "" {
+		t.Errorf("expected empty title, got %q", got)
+	}
+	if len(blocks) == 0 {
+		t.Error("expected at least one block")
+	}
+}
+
 // mustLoadBlocks loads a .notion.json fixture file.
 // It supports an optional "children" array field on each block for test fixtures
 // (the real API returns children via a separate endpoint).

@@ -146,7 +146,7 @@ func pushPage(
 	}
 
 	// Parse local markdown → blocks.
-	_, localBlocks, err := convert.PushPage(localContent)
+	localPage, localBlocks, err := convert.PushPage(localContent)
 	if err != nil {
 		return fmt.Errorf("parse local markdown: %w", err)
 	}
@@ -162,6 +162,13 @@ func pushPage(
 	// Apply in order: Deletes → Updates → Inserts.
 	if err := applyOps(ctx, client, notionID, ops); err != nil {
 		return err
+	}
+
+	// Push title change if it differs from remote.
+	if localTitle := localPage.Title(); localTitle != "" && localTitle != remotePage.Title() {
+		if err := client.UpdatePage(ctx, notionID, localTitle); err != nil {
+			return fmt.Errorf("update title: %w", err)
+		}
 	}
 
 	// Push property changes for database entries.
