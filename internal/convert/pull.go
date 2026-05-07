@@ -27,6 +27,13 @@ type ConvertedPage struct {
 	AssetRefs   []AssetRef
 }
 
+// BlockMarkdown renders a single block to markdown for comparison purposes.
+// Used by blockdiff; no anchors are emitted.
+func BlockMarkdown(b notion.Block) string {
+	md, _, _ := pullBlock(b, PullOptions{}, 0)
+	return md
+}
+
 // PullPage converts a Notion page and its blocks to a ConvertedPage.
 // Asset URLs are left as-is; AssetRefs describes what to download.
 func PullPage(p notion.Page, blocks []notion.Block, opts PullOptions) (ConvertedPage, error) {
@@ -110,9 +117,7 @@ func pullBlocks(blocks []notion.Block, opts PullOptions, _ bool) (string, []Asse
 // pullBlock converts a single block to its markdown representation.
 // seq is the 1-based counter for numbered list items.
 func pullBlock(b notion.Block, opts PullOptions, seq int) (string, []AssetRef, error) {
-	content := b.Content()
-
-	switch c := content.(type) {
+	switch c := b.Content.(type) {
 	case *notion.ParagraphContent:
 		text := RenderRichText(c.RichText)
 		if text == "" {
@@ -306,8 +311,7 @@ func pullTable(b notion.Block, c *notion.TableContent, _ PullOptions) (string, [
 	var sb strings.Builder
 
 	for i, row := range rows {
-		rc := row.Content()
-		trc, ok := rc.(*notion.TableRowContent)
+		trc, ok := row.Content.(*notion.TableRowContent)
 		if !ok {
 			continue
 		}

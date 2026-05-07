@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -15,6 +16,7 @@ import (
 	"github.com/harleenquinzell/nodin/internal/assets"
 	"github.com/harleenquinzell/nodin/internal/config"
 	"github.com/harleenquinzell/nodin/internal/convert"
+	"github.com/harleenquinzell/nodin/internal/merge"
 	"github.com/harleenquinzell/nodin/internal/notion"
 	"github.com/harleenquinzell/nodin/internal/pathmap"
 	"github.com/harleenquinzell/nodin/internal/state"
@@ -22,6 +24,7 @@ import (
 
 // PullReport summarises the results of a pull.
 type PullReport struct {
+	mu        sync.Mutex
 	Pulled    int
 	Updated   int
 	Conflicts int
@@ -158,10 +161,21 @@ func pullPage(
 			}
 		} else {
 			// Three-way merge: base=snapshot, local=existing, remote=converted.
-			// For Phase 2, do a simple overwrite if merge package not yet available.
-			// TODO: implement merge in Phase 3 (merge package not yet built).
-			if err := writeFileAtomic(absPath, body); err != nil {
-				return err
+			result, mergeErr := merge.ThreeWay(snapshot, string(existing), body)
+			if mergeErr != nil {
+				// git unavailable or catastrophic failure; fall back to remote.
+				if err := writeFileAtomic(absPath, body); err != nil {
+					return err
+				}
+			} else {
+				if err := writeFileAtomic(absPath, result.Content); err != nil {
+					return err
+				}
+				if result.Conflicts {
+					report.mu.Lock()
+					report.Conflicts++
+					report.mu.Unlock()
+				}
 			}
 		}
 	}
@@ -193,6 +207,11 @@ func pullPage(
 	}); err != nil {
 		return fmt.Errorf("update index: %w", err)
 	}
+
+	report.mu.Lock()
+	report.Pulled++
+	report.Pages = append(report.Pages, localPath)
+	report.mu.Unlock()
 
 	return nil
 }

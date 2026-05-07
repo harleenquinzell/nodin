@@ -96,6 +96,47 @@ func unifiedDiff(want, got string) string {
 	return sb.String()
 }
 
+func TestRoundTrip(t *testing.T) {
+	entries, err := os.ReadDir("testdata")
+	if err != nil {
+		t.Fatalf("read testdata: %v", err)
+	}
+
+	opts := convert.PullOptions{
+		AnchorRules: convert.DefaultAnchorRules(),
+	}
+
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".notion.json") {
+			continue
+		}
+		name := strings.TrimSuffix(e.Name(), ".notion.json")
+		t.Run(name, func(t *testing.T) {
+			blocks := mustLoadBlocks(t, "testdata/"+name+".notion.json")
+			page := notion.Page{}
+
+			cp1, err := convert.PullPage(page, blocks, opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, blocks2, err := convert.PushPage(cp1.Frontmatter + cp1.Body)
+			if err != nil {
+				t.Fatalf("PushPage failed: %v", err)
+			}
+
+			cp2, err := convert.PullPage(page, blocks2, opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cp1.Body != cp2.Body {
+				t.Errorf("round-trip body mismatch for %q:\n%s", name, unifiedDiff(cp1.Body, cp2.Body))
+			}
+		})
+	}
+}
+
 func TestPullBlocks(t *testing.T) {
 	entries, err := os.ReadDir("testdata")
 	if err != nil {

@@ -26,6 +26,33 @@ func (c *Client) GetPage(ctx context.Context, id string) (*Page, error) {
 	return &page, nil
 }
 
+// UpdatePage updates the title of a Notion page.
+func (c *Client) UpdatePage(ctx context.Context, id, title string) error {
+	body := map[string]any{
+		"properties": map[string]any{
+			"title": map[string]any{
+				"title": []map[string]any{
+					{"type": "text", "text": map[string]any{"content": title}},
+				},
+			},
+		},
+	}
+	_, err := c.do(ctx, "PATCH", "/pages/"+normalizeID(id), body)
+	if err != nil {
+		return fmt.Errorf("update page %s: %w", id, err)
+	}
+	return nil
+}
+
+// ArchivePage soft-deletes a Notion page by setting archived=true.
+func (c *Client) ArchivePage(ctx context.Context, id string) error {
+	_, err := c.do(ctx, "PATCH", "/pages/"+normalizeID(id), map[string]any{"archived": true})
+	if err != nil {
+		return fmt.Errorf("archive page %s: %w", id, err)
+	}
+	return nil
+}
+
 // normalizeID returns the hyphenated form of a Notion UUID.
 // Both "3589c9400284..." and "3589c940-0284-..." are accepted.
 func normalizeID(id string) string {

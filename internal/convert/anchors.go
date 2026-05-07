@@ -41,8 +41,7 @@ func ShouldAnchor(b notion.Block, isFirstInListRun bool) bool {
 
 	case "paragraph":
 		// Anchor paragraphs that have formatting or hard line breaks.
-		content := b.Content()
-		if pc, ok := content.(*notion.ParagraphContent); ok {
+		if pc, ok := b.Content.(*notion.ParagraphContent); ok {
 			return paragraphNeedsAnchor(pc.RichText)
 		}
 		return false
