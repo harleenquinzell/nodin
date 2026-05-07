@@ -30,15 +30,16 @@ func newDiffCmd() *cobra.Command {
 				return fmt.Errorf("read index: %w", err)
 			}
 
-			// Normalise the argument to a path relative to SyncDir.
+			// Resolve the argument to a path relative to SyncDir.
+			// Relative paths are first resolved against CWD so the command
+			// works correctly regardless of which directory the user is in.
 			arg := args[0]
-			var relPath string
-			if filepath.IsAbs(arg) {
-				relPath, err = filepath.Rel(cfg.SyncDir, arg)
-				if err != nil {
-					relPath = arg
-				}
-			} else {
+			if !filepath.IsAbs(arg) {
+				cwd, _ := os.Getwd()
+				arg = filepath.Join(cwd, arg)
+			}
+			relPath, err := filepath.Rel(cfg.SyncDir, arg)
+			if err != nil {
 				relPath = arg
 			}
 			relPath = filepath.ToSlash(relPath)
