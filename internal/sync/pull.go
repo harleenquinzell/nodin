@@ -23,6 +23,16 @@ import (
 	"github.com/harleenquinzell/nodin/internal/state"
 )
 
+// PullOptions configures the behaviour of a pull operation.
+type PullOptions struct {
+	// PageID, if non-empty, fetches only that specific page instead of using
+	// the incremental cursor. Accepts both hyphenated and bare UUIDs.
+	PageID string
+	// Since, if non-zero, overrides the stored LastSync cursor for this run.
+	// The stored cursor is not updated when this is set.
+	Since time.Time
+}
+
 // PullReport summarises the results of a pull.
 type PullReport struct {
 	mu        sync.Mutex
@@ -38,7 +48,7 @@ func (r *PullReport) Summary() string {
 }
 
 // Pull fetches pages updated since the last sync and writes them to disk.
-func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *notion.Client) (*PullReport, error) {
+func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *notion.Client, pullOpts PullOptions) (*PullReport, error) {
 	if err := PreCommit(cfg.SyncDir, "pull", cfg.AutoCommit); err != nil {
 		return nil, fmt.Errorf("pre-pull commit: %w", err)
 	}
@@ -48,9 +58,23 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		return nil, fmt.Errorf("read state: %w", err)
 	}
 
-	pages, err := client.IncrementalPages(ctx, st.LastSync)
-	if err != nil {
-		return nil, fmt.Errorf("fetch pages: %w", err)
+	var pages []notion.Page
+	if pullOpts.PageID != "" {
+		// Single-page fetch: bypass the incremental cursor entirely.
+		page, err := client.GetPage(ctx, pullOpts.PageID)
+		if err != nil {
+			return nil, fmt.Errorf("get page: %w", err)
+		}
+		pages = []notion.Page{*page}
+	} else {
+		cursor := st.LastSync
+		if !pullOpts.Since.IsZero() {
+			cursor = pullOpts.Since
+		}
+		pages, err = client.IncrementalPages(ctx, cursor)
+		if err != nil {
+			return nil, fmt.Errorf("fetch pages: %w", err)
+		}
 	}
 
 	// Build an in-memory lookup for path resolution.
@@ -124,7 +148,8 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 	}
 
 	// Update LastSync to the minimum LastEditedTime in this batch to avoid skew.
-	if len(pages) > 0 {
+	// Skip when --page or --since overrides were used; those runs are not full syncs.
+	if len(pages) > 0 && pullOpts.PageID == "" && pullOpts.Since.IsZero() {
 		minTime := pages[0].LastEditedTime
 		for _, p := range pages[1:] {
 			if p.LastEditedTime.Before(minTime) {
@@ -181,6 +206,8 @@ func pullPage(
 	if err != nil {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
+
+	isNew := snapshot == ""
 
 	if snapshot == "" {
 		// First pull: write directly, no merge needed.
@@ -246,7 +273,11 @@ func pullPage(
 	}
 
 	report.mu.Lock()
-	report.Pulled++
+	if isNew {
+		report.Pulled++
+	} else {
+		report.Updated++
+	}
 	report.Pages = append(report.Pages, localPath)
 	report.mu.Unlock()
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -879,6 +878,5 @@ func isBlockStart(line string) bool {
 	if line == "<details>" {
 		return true
 	}
-	_ = strconv.Itoa // avoid unused import issue
 	return false
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -28,18 +29,23 @@ func newPullCmd() *cobra.Command {
 				return fmt.Errorf("invalid config: %w", err)
 			}
 
-			token, err := cfg.ResolvedToken()
-			if err != nil {
-				return fmt.Errorf("resolve token: %w", err)
-			}
-
 			if dryRun {
 				cmd.Println("dry-run: no files will be written")
 				return nil
 			}
 
-			_ = pageID
-			_ = since
+			var sinceTime time.Time
+			if since != "" {
+				sinceTime, err = time.Parse(time.RFC3339, since)
+				if err != nil {
+					return fmt.Errorf("--since: expected RFC 3339 timestamp (e.g. 2024-01-15T10:00:00Z): %w", err)
+				}
+			}
+
+			token, err := cfg.ResolvedToken()
+			if err != nil {
+				return fmt.Errorf("resolve token: %w", err)
+			}
 
 			client := notion.NewClient(token, cfg.RPS)
 			store := state.Open(cfg.SyncDir)
@@ -49,7 +55,8 @@ func newPullCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
-			report, err := internalsync.Pull(ctx, cfg, store, client)
+			pullOpts := internalsync.PullOptions{PageID: pageID, Since: sinceTime}
+			report, err := internalsync.Pull(ctx, cfg, store, client, pullOpts)
 			if err != nil {
 				return err
 			}
@@ -63,8 +70,8 @@ func newPullCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without writing files")
-	cmd.Flags().StringVar(&pageID, "page", "", "pull only this page (and its descendants)")
-	cmd.Flags().StringVar(&since, "since", "", "override incremental cursor (ISO 8601 timestamp)")
+	cmd.Flags().StringVar(&pageID, "page", "", "pull only this page (Notion ID)")
+	cmd.Flags().StringVar(&since, "since", "", "override incremental cursor (RFC 3339, e.g. 2024-01-15T10:00:00Z)")
 
 	return cmd
 }
