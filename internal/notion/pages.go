@@ -8,6 +8,29 @@ import (
 	"strings"
 )
 
+// CreatePage creates a new child page under parentID with the given title.
+func (c *Client) CreatePage(ctx context.Context, parentID, title string) (*Page, error) {
+	body := map[string]any{
+		"parent": map[string]any{"type": "page_id", "page_id": normalizeID(parentID)},
+		"properties": map[string]any{
+			"title": map[string]any{
+				"title": []map[string]any{
+					{"type": "text", "text": map[string]any{"content": title}},
+				},
+			},
+		},
+	}
+	data, err := c.do(ctx, "POST", "/pages", body)
+	if err != nil {
+		return nil, fmt.Errorf("create page: %w", err)
+	}
+	var page Page
+	if err := json.Unmarshal(data, &page); err != nil {
+		return nil, fmt.Errorf("parse created page: %w", err)
+	}
+	return &page, nil
+}
+
 // GetPage fetches a Notion page by ID.
 // Accepts both hyphenated and unhyphenated UUIDs.
 func (c *Client) GetPage(ctx context.Context, id string) (*Page, error) {
