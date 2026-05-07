@@ -65,16 +65,13 @@ download_assets = true       # download images and files locally
 ## Development
 
 ```sh
-go test ./...        # unit tests, no network needed
-go build -o nodin ./cmd/nodin
+make build           # build the binary
+make test            # unit tests, no network needed
+make test-integration  # integration tests — reads credentials from .env
+make help            # list all targets
 ```
 
-For integration tests, copy `.env.example` to `.env`, fill in your token and a test page ID, then:
-
-```sh
-source .env
-go test -tags integration ./internal/sync/ ./internal/notion/
-```
+The Makefile works from any directory. For integration tests, copy `.env.example` to `.env` and fill in your values first.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 

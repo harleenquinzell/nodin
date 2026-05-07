@@ -13,15 +13,11 @@
 ## Running tests
 
 ```sh
-# Unit tests — no network, no env vars required:
-go test ./...
-
-# Integration tests — requires a real Notion workspace:
-source .env   # see .env.example
-go test -tags integration ./internal/sync/ ./internal/notion/
+make test              # unit tests, no network required
+make test-integration  # integration tests against a real Notion workspace
 ```
 
-Copy `.env.example` to `.env` and fill in `NODIN_TEST_TOKEN` (a Notion integration token) and `NODIN_TEST_PAGE_ID` (a page the token can write under). Integration tests create and clean up their own pages prefixed `nodin-test-` and are safe to run repeatedly.
+For integration tests, copy `.env.example` to `.env` and fill in `NODIN_TEST_TOKEN` (a Notion integration token) and `NODIN_TEST_PAGE_ID` (a page the token can freely write under). The Makefile sources `.env` automatically. Tests create and clean up their own pages prefixed `nodin-test-` and are safe to run repeatedly.
 
 ## Coding conventions
 
