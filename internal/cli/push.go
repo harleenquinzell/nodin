@@ -27,27 +27,43 @@ func newPushCmd() *cobra.Command {
 				return fmt.Errorf("invalid config: %w", err)
 			}
 
+			store := state.Open(cfg.SyncDir)
+			if err := store.Init(); err != nil {
+				return fmt.Errorf("init state: %w", err)
+			}
+
+			if dryRun {
+				entries, err := internalsync.Status(cfg, store)
+				if err != nil {
+					return fmt.Errorf("status: %w", err)
+				}
+				n := 0
+				for _, e := range entries {
+					if e.Status == internalsync.FileModified || e.Status == internalsync.FileDeleted {
+						if pageID == "" || e.NotionID == pageID || e.LocalPath == pageID {
+							cmd.Printf("  %s  %s\n", e.Status, e.LocalPath)
+							n++
+						}
+					}
+				}
+				if n == 0 {
+					cmd.Println("nothing to push")
+				} else {
+					cmd.Printf("dry-run: %d page(s) would be pushed\n", n)
+				}
+				return nil
+			}
+
 			token, err := cfg.ResolvedToken()
 			if err != nil {
 				return fmt.Errorf("resolve token: %w", err)
 			}
 
-			if dryRun {
-				cmd.Println("dry-run: no changes will be pushed to Notion")
-				return nil
-			}
-
-			_ = pageID
-
 			client := notion.NewClient(token, cfg.RPS)
-			store := state.Open(cfg.SyncDir)
-
-			if err := store.Init(); err != nil {
-				return fmt.Errorf("init state: %w", err)
-			}
-
 			ctx := cmd.Context()
-			report, err := internalsync.Push(ctx, cfg, store, client)
+
+			pushOpts := internalsync.PushOptions{PageID: pageID}
+			report, err := internalsync.Push(ctx, cfg, store, client, pushOpts)
 			if err != nil {
 				return err
 			}
@@ -58,7 +74,7 @@ func newPushCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "report what would change without pushing to Notion")
-	cmd.Flags().StringVar(&pageID, "page", "", "push only this page")
+	cmd.Flags().StringVar(&pageID, "page", "", "push only this page (Notion ID or local path)")
 
 	return cmd
 }

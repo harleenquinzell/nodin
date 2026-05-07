@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -16,6 +18,13 @@ import (
 	"github.com/harleenquinzell/nodin/internal/notion"
 	"github.com/harleenquinzell/nodin/internal/state"
 )
+
+// PushOptions configures the behaviour of a push operation.
+type PushOptions struct {
+	// PageID, if non-empty, restricts the push to the page with this Notion ID
+	// or local path. Both forms are accepted.
+	PageID string
+}
 
 // PushReport summarises the results of a push.
 type PushReport struct {
@@ -32,7 +41,7 @@ func (r *PushReport) Summary() string {
 }
 
 // Push reads locally modified pages and uploads the changes to Notion.
-func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *notion.Client) (*PushReport, error) {
+func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *notion.Client, pushOpts PushOptions) (*PushReport, error) {
 	if err := PreCommit(cfg.SyncDir, "push", cfg.AutoCommit); err != nil {
 		return nil, fmt.Errorf("pre-push commit: %w", err)
 	}
@@ -50,6 +59,14 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 
 	for id, entry := range idx {
 		if entry.Type != "page" {
+			report.mu.Lock()
+			report.Skipped++
+			report.mu.Unlock()
+			continue
+		}
+
+		// Apply --page filter: match by Notion ID or local path.
+		if pushOpts.PageID != "" && id != pushOpts.PageID && entry.LocalPath != pushOpts.PageID {
 			report.mu.Lock()
 			report.Skipped++
 			report.mu.Unlock()
@@ -212,6 +229,19 @@ func pushProperties(ctx context.Context, client *notion.Client, page *notion.Pag
 		return fmt.Errorf("get database schema: %w", err)
 	}
 	schema := db.Schema()
+
+	// Pre-flight: reject property names that don't exist in the database schema.
+	var unknown []string
+	for name := range fm.Properties {
+		if _, ok := schema[name]; !ok {
+			unknown = append(unknown, name)
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf("properties not in database schema: %s", strings.Join(unknown, ", "))
+	}
+
 	props, err := convert.YAMLToProperties(fm.Properties, fm.Computed, schema)
 	if err != nil {
 		return fmt.Errorf("parse properties: %w", err)
