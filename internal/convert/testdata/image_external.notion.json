@@ -1,0 +1,14 @@
+[
+  {
+    "id": "aaa00018-0000-0000-0000-000000000001",
+    "type": "image",
+    "has_children": false,
+    "image": {
+      "type": "external",
+      "external": {
+        "url": "https://example.com/photo.png"
+      },
+      "caption": []
+    }
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "aaa00012-0000-0000-0000-000000000001",
+    "type": "callout",
+    "has_children": false,
+    "callout": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "This is important.",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "This is important.", "link": null}
+        }
+      ],
+      "icon": {
+        "type": "emoji",
+        "emoji": "💡"
+      },
+      "color": "gray_background"
+    }
+  }
+]

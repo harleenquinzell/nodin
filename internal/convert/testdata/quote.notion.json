@@ -1,0 +1,19 @@
+[
+  {
+    "id": "aaa00011-0000-0000-0000-000000000001",
+    "type": "quote",
+    "has_children": false,
+    "quote": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "To be or not to be.",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "To be or not to be.", "link": null}
+        }
+      ],
+      "color": "default"
+    }
+  }
+]

@@ -1,0 +1,55 @@
+[
+  {
+    "id": "aaa00021-0000-0000-0000-000000000001",
+    "type": "bulleted_list_item",
+    "has_children": true,
+    "bulleted_list_item": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Parent item",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Parent item", "link": null}
+        }
+      ],
+      "color": "default"
+    },
+    "children": [
+      {
+        "id": "aaa00021-0000-0000-0000-000000000002",
+        "type": "bulleted_list_item",
+        "has_children": false,
+        "bulleted_list_item": {
+          "rich_text": [
+            {
+              "type": "text",
+              "plain_text": "Child item",
+              "href": null,
+              "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+              "text": {"content": "Child item", "link": null}
+            }
+          ],
+          "color": "default"
+        }
+      }
+    ]
+  },
+  {
+    "id": "aaa00021-0000-0000-0000-000000000003",
+    "type": "bulleted_list_item",
+    "has_children": false,
+    "bulleted_list_item": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Sibling item",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Sibling item", "link": null}
+        }
+      ],
+      "color": "default"
+    }
+  }
+]

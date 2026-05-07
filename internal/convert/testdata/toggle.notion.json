@@ -1,0 +1,38 @@
+[
+  {
+    "id": "aaa00010-0000-0000-0000-000000000001",
+    "type": "toggle",
+    "has_children": true,
+    "toggle": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Click to expand",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Click to expand", "link": null}
+        }
+      ],
+      "color": "default"
+    },
+    "children": [
+      {
+        "id": "aaa00010-0000-0000-0000-000000000002",
+        "type": "paragraph",
+        "has_children": false,
+        "paragraph": {
+          "rich_text": [
+            {
+              "type": "text",
+              "plain_text": "Hidden content here.",
+              "href": null,
+              "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+              "text": {"content": "Hidden content here.", "link": null}
+            }
+          ],
+          "color": "default"
+        }
+      }
+    ]
+  }
+]

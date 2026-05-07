@@ -1,0 +1,20 @@
+[
+  {
+    "id": "aaa00003-0000-0000-0000-000000000001",
+    "type": "heading_1",
+    "has_children": false,
+    "heading_1": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Top Level Heading",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Top Level Heading", "link": null}
+        }
+      ],
+      "color": "default",
+      "is_toggleable": false
+    }
+  }
+]

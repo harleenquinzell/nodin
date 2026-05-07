@@ -1,0 +1,20 @@
+[
+  {
+    "id": "aaa00005-0000-0000-0000-000000000001",
+    "type": "heading_3",
+    "has_children": false,
+    "heading_3": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Subsection Heading",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Subsection Heading", "link": null}
+        }
+      ],
+      "color": "default",
+      "is_toggleable": false
+    }
+  }
+]

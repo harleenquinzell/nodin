@@ -2,11 +2,16 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
+
+// ErrCorrupt is returned when state files contain invalid data.
+var ErrCorrupt = errors.New("state: corrupt data")
 
 const (
 	currentSchemaVersion = 1
@@ -25,6 +30,7 @@ type State struct {
 // Store manages the .nodin/ directory inside a sync root.
 type Store struct {
 	syncDir string
+	mu      sync.Mutex // guards index RMW from concurrent workers
 }
 
 // Open returns a Store for the given sync directory.

@@ -1,0 +1,19 @@
+[
+  {
+    "id": "aaa00019-0000-0000-0000-000000000001",
+    "type": "bookmark",
+    "has_children": false,
+    "bookmark": {
+      "url": "https://go.dev",
+      "caption": [
+        {
+          "type": "text",
+          "plain_text": "Go Language",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Go Language", "link": null}
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "aaa00020-0000-0000-0000-000000000001",
+    "type": "synced_block",
+    "has_children": false,
+    "synced_block": {
+      "synced_from": null
+    }
+  }
+]

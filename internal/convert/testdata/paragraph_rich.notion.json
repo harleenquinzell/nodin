@@ -1,0 +1,75 @@
+[
+  {
+    "id": "aaa00002-0000-0000-0000-000000000001",
+    "type": "paragraph",
+    "has_children": false,
+    "paragraph": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "bold",
+          "href": null,
+          "annotations": {"bold":true,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "bold", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": " and ",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": " and ", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": "italic",
+          "href": null,
+          "annotations": {"bold":false,"italic":true,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "italic", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": " and ",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": " and ", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": "code",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":true,"color":"default"},
+          "text": {"content": "code", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": " and ",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": " and ", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": "link",
+          "href": "https://example.com",
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "link", "link": {"url": "https://example.com"}}
+        },
+        {
+          "type": "text",
+          "plain_text": " and ",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": " and ", "link": null}
+        },
+        {
+          "type": "text",
+          "plain_text": "struck",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":true,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "struck", "link": null}
+        }
+      ],
+      "color": "default"
+    }
+  }
+]

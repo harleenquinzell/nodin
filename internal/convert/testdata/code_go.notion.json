@@ -1,0 +1,20 @@
+[
+  {
+    "id": "aaa00014-0000-0000-0000-000000000001",
+    "type": "code",
+    "has_children": false,
+    "code": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "package main\n\nfunc main() {}",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "package main\n\nfunc main() {}", "link": null}
+        }
+      ],
+      "caption": [],
+      "language": "go"
+    }
+  }
+]

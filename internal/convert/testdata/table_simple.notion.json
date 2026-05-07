@@ -1,0 +1,47 @@
+[
+  {
+    "id": "aaa00016-0000-0000-0000-000000000001",
+    "type": "table",
+    "has_children": true,
+    "table": {
+      "table_width": 2,
+      "has_column_header": true,
+      "has_row_header": false
+    },
+    "children": [
+      {
+        "id": "aaa00016-0000-0000-0000-000000000002",
+        "type": "table_row",
+        "has_children": false,
+        "table_row": {
+          "cells": [
+            [{"type":"text","plain_text":"Name","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"Name","link":null}}],
+            [{"type":"text","plain_text":"Value","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"Value","link":null}}]
+          ]
+        }
+      },
+      {
+        "id": "aaa00016-0000-0000-0000-000000000003",
+        "type": "table_row",
+        "has_children": false,
+        "table_row": {
+          "cells": [
+            [{"type":"text","plain_text":"alpha","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"alpha","link":null}}],
+            [{"type":"text","plain_text":"1","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"1","link":null}}]
+          ]
+        }
+      },
+      {
+        "id": "aaa00016-0000-0000-0000-000000000004",
+        "type": "table_row",
+        "has_children": false,
+        "table_row": {
+          "cells": [
+            [{"type":"text","plain_text":"beta","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"beta","link":null}}],
+            [{"type":"text","plain_text":"2","href":null,"annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"text":{"content":"2","link":null}}]
+          ]
+        }
+      }
+    ]
+  }
+]
