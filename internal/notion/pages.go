@@ -26,6 +26,92 @@ func (c *Client) GetPage(ctx context.Context, id string) (*Page, error) {
 	return &page, nil
 }
 
+// UpdatePageProperties patches a set of database entry properties.
+// Only the properties in props are sent; unmentioned properties are unchanged.
+// Computed properties (formula, rollup, etc.) are silently skipped.
+func (c *Client) UpdatePageProperties(ctx context.Context, id string, props map[string]PropertyValue) error {
+	apiProps := make(map[string]any, len(props))
+	for name, pv := range props {
+		if pv.Computed {
+			continue
+		}
+		apiProps[name] = propertyValueToAPI(pv)
+	}
+	if len(apiProps) == 0 {
+		return nil
+	}
+	_, err := c.do(ctx, "PATCH", "/pages/"+normalizeID(id), map[string]any{"properties": apiProps})
+	if err != nil {
+		return fmt.Errorf("update properties for page %s: %w", id, err)
+	}
+	return nil
+}
+
+// propertyValueToAPI converts a PropertyValue to the Notion API patch format.
+func propertyValueToAPI(pv PropertyValue) map[string]any {
+	switch pv.Type {
+	case "rich_text":
+		return map[string]any{"rich_text": []map[string]any{
+			{"type": "text", "text": map[string]any{"content": pv.Text}},
+		}}
+	case "number":
+		if pv.Number == nil {
+			return map[string]any{"number": nil}
+		}
+		return map[string]any{"number": *pv.Number}
+	case "select":
+		if pv.Select == "" {
+			return map[string]any{"select": nil}
+		}
+		return map[string]any{"select": map[string]any{"name": pv.Select}}
+	case "status":
+		return map[string]any{"status": map[string]any{"name": pv.Select}}
+	case "multi_select":
+		opts := make([]map[string]any, len(pv.MultiSel))
+		for i, s := range pv.MultiSel {
+			opts[i] = map[string]any{"name": s}
+		}
+		return map[string]any{"multi_select": opts}
+	case "date":
+		if pv.Date == nil {
+			return map[string]any{"date": nil}
+		}
+		d := map[string]any{"start": pv.Date.Start}
+		if pv.Date.End != "" {
+			d["end"] = pv.Date.End
+		}
+		if pv.Date.TZ != "" {
+			d["time_zone"] = pv.Date.TZ
+		}
+		return map[string]any{"date": d}
+	case "checkbox":
+		if pv.Checkbox == nil {
+			return map[string]any{"checkbox": false}
+		}
+		return map[string]any{"checkbox": *pv.Checkbox}
+	case "url":
+		return map[string]any{"url": pv.Text}
+	case "email":
+		return map[string]any{"email": pv.Text}
+	case "phone_number":
+		return map[string]any{"phone_number": pv.Text}
+	case "people":
+		people := make([]map[string]any, len(pv.People))
+		for i, id := range pv.People {
+			people[i] = map[string]any{"object": "user", "id": id}
+		}
+		return map[string]any{"people": people}
+	case "relation":
+		rels := make([]map[string]any, len(pv.Relation))
+		for i, id := range pv.Relation {
+			rels[i] = map[string]any{"id": id}
+		}
+		return map[string]any{"relation": rels}
+	default:
+		return map[string]any{}
+	}
+}
+
 // UpdatePage updates the title of a Notion page.
 func (c *Client) UpdatePage(ctx context.Context, id, title string) error {
 	body := map[string]any{

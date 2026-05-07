@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -53,13 +54,49 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 	}
 
 	// Build an in-memory lookup for path resolution.
+	// Include database parents so database entries resolve to databases/ instead of _orphans/.
 	pageMap := make(map[string]notion.Page, len(pages))
 	for _, p := range pages {
 		pageMap[p.ID] = p
 	}
+
+	// Collect unique database parent IDs from this batch.
+	dbIDs := make(map[string]bool)
+	for _, p := range pages {
+		if p.Parent.Type == "database_id" {
+			dbIDs[p.Parent.DatabaseID] = true
+		}
+	}
+	// Fetch each database and add a Page-compatible entry so pathmap can resolve the slug.
+	schemas := make(map[string]map[string]string) // db ID → property schema
+	for dbID := range dbIDs {
+		db, err := client.GetDatabase(ctx, dbID)
+		if err != nil {
+			continue // treat entries as orphans if database is inaccessible
+		}
+		pageMap[dbID] = db.AsPage()
+		schemas[dbID] = db.Schema()
+	}
+
 	lookup := func(id string) (notion.Page, bool) {
 		p, ok := pageMap[id]
 		return p, ok
+	}
+
+	// Write _schema.json for each database directory.
+	for dbID, schema := range schemas {
+		dbPage, ok := pageMap[dbID]
+		if !ok {
+			continue
+		}
+		dbDir := filepath.Join(cfg.SyncDir, pathmap.DatabasePath(dbPage))
+		if err := os.MkdirAll(dbDir, 0755); err != nil {
+			continue
+		}
+		schemaPath := filepath.Join(dbDir, "_schema.json")
+		if err := writeJSONFile(schemaPath, schema); err != nil {
+			continue
+		}
 	}
 
 	opts := convert.PullOptions{
@@ -214,6 +251,15 @@ func pullPage(
 	report.mu.Unlock()
 
 	return nil
+}
+
+// writeJSONFile atomically writes v as indented JSON to path.
+func writeJSONFile(path string, v any) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal JSON: %w", err)
+	}
+	return writeFileAtomic(path, string(data)+"\n")
 }
 
 // writeFileAtomic writes content to path using a temp file + rename.

@@ -536,6 +536,8 @@ func (p *lineParser) parseParagraph(indent int) (notion.Block, error) {
 	}
 
 	text := strings.Join(textLines, "\n")
+	// Convert trailing-space markdown hard breaks back to embedded newlines.
+	text = strings.ReplaceAll(text, "  \n", "\n")
 	return notion.Block{
 		Type:    "paragraph",
 		Content: &notion.ParagraphContent{RichText: parseInlineRichText(text)},

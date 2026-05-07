@@ -316,3 +316,42 @@ type Database struct {
 func (d *Database) TitleText() string {
 	return richTextPlain(d.Title)
 }
+
+// Schema returns a map from property name → Notion property type ("select", "number", …).
+// The "title" property is omitted since it is handled separately as the page title.
+func (d *Database) Schema() map[string]string {
+	schema := make(map[string]string, len(d.Properties))
+	for name, raw := range d.Properties {
+		var envelope struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Type != "title" {
+			schema[name] = envelope.Type
+		}
+	}
+	return schema
+}
+
+// AsPage returns a Page that represents this database for use in pathmap lookups.
+// Only the ID, Parent, and title properties are populated.
+func (d *Database) AsPage() Page {
+	titleRaw, _ := json.Marshal(map[string]any{
+		"type": "title",
+		"title": []map[string]any{{
+			"type":      "text",
+			"plain_text": d.TitleText(),
+			"text":       map[string]any{"content": d.TitleText(), "link": nil},
+			"annotations": map[string]bool{
+				"bold": false, "italic": false,
+				"strikethrough": false, "underline": false, "code": false,
+			},
+		}},
+	})
+	return Page{
+		ID:     d.ID,
+		Parent: d.Parent,
+		Properties: map[string]json.RawMessage{
+			"title": json.RawMessage(titleRaw),
+		},
+	}
+}

@@ -36,12 +36,30 @@ func BlockMarkdown(b notion.Block) string {
 
 // PullPage converts a Notion page and its blocks to a ConvertedPage.
 // Asset URLs are left as-is; AssetRefs describes what to download.
+// For database entry pages (Parent.Type == "database_id"), property values are
+// included in the frontmatter under properties: and computed: sections.
 func PullPage(p notion.Page, blocks []notion.Block, opts PullOptions) (ConvertedPage, error) {
 	cp := ConvertedPage{}
 
 	fm := Frontmatter{
 		Title: p.Title(),
 	}
+
+	// Include database entry properties in frontmatter.
+	if p.Parent.Type == "database_id" && len(p.Properties) > 0 {
+		parsed := make(map[string]notion.PropertyValue, len(p.Properties))
+		for name, raw := range p.Properties {
+			pv, err := notion.ParsePropertyValue(raw)
+			if err != nil || pv.Type == "title" {
+				continue
+			}
+			parsed[name] = pv
+		}
+		if len(parsed) > 0 {
+			fm.Properties, fm.Computed = PropertiesToYAML(parsed)
+		}
+	}
+
 	cp.Frontmatter = RenderFrontmatter(fm)
 
 	body, refs, err := pullBlocks(blocks, opts, false)
@@ -120,6 +138,8 @@ func pullBlock(b notion.Block, opts PullOptions, seq int) (string, []AssetRef, e
 	switch c := b.Content.(type) {
 	case *notion.ParagraphContent:
 		text := RenderRichText(c.RichText)
+		// Embedded \n in paragraph rich text = hard line break → trailing-space markdown syntax.
+		text = strings.ReplaceAll(text, "\n", "  \n")
 		if text == "" {
 			return "\n", nil, nil
 		}

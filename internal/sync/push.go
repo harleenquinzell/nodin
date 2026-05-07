@@ -164,6 +164,13 @@ func pushPage(
 		return err
 	}
 
+	// Push property changes for database entries.
+	if remotePage.Parent.Type == "database_id" {
+		if err := pushProperties(ctx, client, remotePage, localContent); err != nil {
+			return fmt.Errorf("push properties: %w", err)
+		}
+	}
+
 	if err := store.WriteSnapshot(notionID, localContent); err != nil {
 		return fmt.Errorf("write snapshot: %w", err)
 	}
@@ -182,6 +189,28 @@ func pushPage(
 	report.mu.Unlock()
 
 	return nil
+}
+
+// pushProperties parses the frontmatter of localContent and pushes any editable
+// property changes back to the Notion page. The database schema is fetched to
+// provide type hints for YAML → PropertyValue conversion.
+func pushProperties(ctx context.Context, client *notion.Client, page *notion.Page, localContent string) error {
+	fm, _, err := convert.ParseFrontmatter(localContent)
+	if err != nil || len(fm.Properties) == 0 {
+		return err
+	}
+
+	db, err := client.GetDatabase(ctx, page.Parent.DatabaseID)
+	if err != nil {
+		return fmt.Errorf("get database schema: %w", err)
+	}
+	schema := db.Schema()
+	props, err := convert.YAMLToProperties(fm.Properties, fm.Computed, schema)
+	if err != nil {
+		return fmt.Errorf("parse properties: %w", err)
+	}
+
+	return client.UpdatePageProperties(ctx, page.ID, props)
 }
 
 // applyOps applies a blockdiff op slice to Notion in the correct order:
