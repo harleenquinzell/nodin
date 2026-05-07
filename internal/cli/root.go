@@ -29,6 +29,8 @@ func NewRootCmd(version string) *cobra.Command {
 		newDoctorCmd(),
 		newPullCmd(),
 		newPushCmd(),
+		newStatusCmd(),
+		newDiffCmd(),
 	)
 
 	return root
