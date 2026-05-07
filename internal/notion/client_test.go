@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -204,5 +205,41 @@ func TestIncrementalPages_EarlyExit(t *testing.T) {
 	}
 	if len(pages) != 0 {
 		t.Errorf("expected 0 pages (all older than since), got %d", len(pages))
+	}
+}
+
+func TestRetry_GivesUp(t *testing.T) {
+	var calls atomic.Int32
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+
+	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
+	if err == nil {
+		t.Fatal("expected error after exhausting retries, got nil")
+	}
+	// maxRetries = 5, so 6 total attempts (attempt 0 through 5).
+	if n := calls.Load(); n != 6 {
+		t.Errorf("expected 6 attempts (initial + 5 retries), got %d", n)
+	}
+}
+
+func TestTokenRedacted(t *testing.T) {
+	const secretToken = "secret_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234"
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Echo the Authorization header back in the error body so we can check redaction.
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"object":"error","status":400,"code":"test","message":"auth: %s"}`,
+			r.Header.Get("Authorization"))
+	})).WithToken(secretToken)
+
+	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	errMsg := err.Error()
+	if strings.Contains(errMsg, secretToken) {
+		t.Errorf("error message contains raw token: %s", errMsg)
 	}
 }

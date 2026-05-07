@@ -161,7 +161,7 @@ type NotionError struct {
 }
 
 func (e *NotionError) Error() string {
-	return fmt.Sprintf("notion: %s: %s", e.Code, e.Message)
+	return fmt.Sprintf("notion: %s: %s", e.Code, redactTokens(e.Message))
 }
 
 // listResponse is the generic Notion paginated list envelope.

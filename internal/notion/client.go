@@ -55,6 +55,14 @@ func (c *Client) WithBaseURL(u string) *Client {
 	return &cc
 }
 
+// WithToken returns a shallow copy of the client using a different token.
+// Intended for testing.
+func (c *Client) WithToken(token string) *Client {
+	cc := *c
+	cc.token = token
+	return &cc
+}
+
 // do sends an authenticated request to path, retrying on 429 and 5xx.
 // body is JSON-marshalled if non-nil.
 func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte, error) {
