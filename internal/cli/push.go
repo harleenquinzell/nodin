@@ -47,7 +47,7 @@ func newPushCmd() *cobra.Command {
 					}
 				}
 				if n == 0 {
-					cmd.Println("nothing to push")
+					cmd.Println("dry-run: nothing to push")
 				} else {
 					cmd.Printf("dry-run: %d page(s) would be pushed\n", n)
 				}

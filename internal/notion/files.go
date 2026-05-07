@@ -56,11 +56,9 @@ func (c *Client) uploadSinglePart(ctx context.Context, name, mimeType string, r 
 		return "", err
 	}
 
-	uploadID, err := sendMultipartChunk(ctx, resp.UploadURL, name, r)
-	if err != nil {
+	if _, err := sendMultipartChunk(ctx, resp.UploadURL, name, r); err != nil {
 		return "", fmt.Errorf("single-part upload: %w", err)
 	}
-	_ = uploadID
 	return resp.ID, nil
 }
 

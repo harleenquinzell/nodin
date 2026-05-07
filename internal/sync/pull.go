@@ -253,10 +253,8 @@ func pullPage(
 	if cfg.DownloadAssets && len(converted.AssetRefs) > 0 {
 		httpClient := &http.Client{}
 		for _, ref := range converted.AssetRefs {
-			_, err := assets.Download(ctx, httpClient, ref.URL, ref.FileID, cfg.SyncDir)
-			if err != nil {
-				// Non-fatal: log and continue.
-				_ = err
+			if _, err := assets.Download(ctx, httpClient, ref.URL, ref.FileID, cfg.SyncDir); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: download asset %s: %v\n", ref.FileID, err)
 			}
 		}
 	}

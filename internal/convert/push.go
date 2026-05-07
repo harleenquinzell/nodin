@@ -433,8 +433,7 @@ func (p *lineParser) parseImage(indent int) (notion.Block, error) {
 	raw := p.consume()
 	line := strings.TrimPrefix(raw, prefix)
 
-	alt, url := parseImageMarkdown(line)
-	_ = alt
+	_, url := parseImageMarkdown(line)
 
 	// Check for optional caption on next line: `*caption*`
 	var caption []notion.RichText
