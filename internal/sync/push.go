@@ -30,6 +30,7 @@ type PushOptions struct {
 type PushReport struct {
 	mu        sync.Mutex
 	Pushed    int
+	Created   int
 	Skipped   int
 	Conflicts int
 	Pages     []string
@@ -37,7 +38,8 @@ type PushReport struct {
 
 // Summary returns a one-line summary string.
 func (r *PushReport) Summary() string {
-	return fmt.Sprintf("%d pushed, %d skipped, %d conflicts", r.Pushed, r.Skipped, r.Conflicts)
+	return fmt.Sprintf("%d pushed, %d created, %d skipped, %d conflicts",
+		r.Pushed, r.Created, r.Skipped, r.Conflicts)
 }
 
 // Push reads locally modified pages and uploads the changes to Notion.
@@ -54,6 +56,9 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 	report := &PushReport{}
 	opts := convert.PullOptions{AnchorRules: convert.DefaultAnchorRules()}
 
+	// Keep the original ctx for work that runs after the errgroup; the errgroup
+	// cancels its derived context as soon as Wait returns.
+	parentCtx := ctx
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(cfg.Concurrency)
 
@@ -108,11 +113,66 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		return report, err
 	}
 
+	// Create new pages for any untracked .md files. Skipped when --page filters
+	// to a Notion ID (no creation possible from an ID), but allowed when --page
+	// is a path to scope creation to that one file.
+	if pushOpts.PageID == "" || strings.Contains(pushOpts.PageID, "/") {
+		if err := pushNewPages(parentCtx, cfg, store, client, pushOpts, report); err != nil {
+			return report, err
+		}
+	}
+
 	if err := PostCommit(cfg.SyncDir, "push", report.Summary(), cfg.AutoCommit); err != nil {
 		return report, fmt.Errorf("post-push commit: %w", err)
 	}
 
 	return report, nil
+}
+
+// pushNewPages walks the sync directory for .md files that have no index entry
+// and creates them as new Notion pages or database entries.
+func pushNewPages(
+	ctx context.Context,
+	cfg *config.Config,
+	store *state.Store,
+	client *notion.Client,
+	pushOpts PushOptions,
+	report *PushReport,
+) error {
+	// Re-read the index after the main push loop so that any rows we just wrote
+	// (or that worker goroutines wrote) are visible here.
+	idx, err := store.ReadIndex()
+	if err != nil {
+		return fmt.Errorf("read index for new pages: %w", err)
+	}
+
+	untracked, err := findUntrackedPages(cfg.SyncDir, idx)
+	if err != nil {
+		return fmt.Errorf("scan for untracked files: %w", err)
+	}
+
+	for _, localPath := range untracked {
+		// Honour --page=<path> filter: only create the file the user pointed at.
+		if pushOpts.PageID != "" && filepath.ToSlash(pushOpts.PageID) != localPath {
+			continue
+		}
+		newID, err := createNewPage(ctx, cfg, store, client, idx, localPath)
+		if err != nil {
+			return fmt.Errorf("create %s: %w", localPath, err)
+		}
+		// Refresh idx so subsequent files in the same push can resolve a parent
+		// that was just created (e.g. parent page created earlier in this run).
+		idx[newID] = state.IndexEntry{
+			NotionID:  newID,
+			LocalPath: localPath,
+			Type:      "page",
+		}
+		report.mu.Lock()
+		report.Created++
+		report.Pages = append(report.Pages, localPath)
+		report.mu.Unlock()
+	}
+	return nil
 }
 
 func pushPage(

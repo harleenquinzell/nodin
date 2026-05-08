@@ -352,10 +352,16 @@ func TestE2E_Status(t *testing.T) {
 		t.Fatalf("pull exited %d\noutput:\n%s", code, out)
 	}
 
-	// Find a tracked .md file.
+	// Find a tracked .md file. Skip .nodin/ so we don't pick up snapshots.
 	var mdFile string
 	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() && strings.HasSuffix(path, ".md") && mdFile == "" {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() && info.Name() == ".nodin" {
+			return filepath.SkipDir
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".md") && mdFile == "" {
 			mdFile = path
 		}
 		return nil
@@ -388,5 +394,128 @@ func TestE2E_Status(t *testing.T) {
 	}
 	if !strings.Contains(out, "M ") {
 		t.Errorf("expected 'M ' in status output after edit, got:\n%s", out)
+	}
+}
+
+// TestE2E_PushCreatesNewPage covers the full create-locally-then-push flow via
+// the CLI: init → write a brand-new .md file at pages/<slug>/<slug>.md → push →
+// re-pull and verify the file content matches what's now in Notion.
+func TestE2E_PushCreatesNewPage(t *testing.T) {
+	token, rootPageID := e2eCredentials(t)
+	dir := t.TempDir()
+	client := notion.NewClient(token, 3)
+
+	initWorkspace(t, dir, token, rootPageID)
+
+	// Create a brand-new page locally — no frontmatter, just an H1 + body.
+	slug := fmt.Sprintf("nodin-e2e-create-%d", rand.Int63n(1_000_000_000))
+	pageDir := filepath.Join(dir, "pages", slug)
+	if err := os.MkdirAll(pageDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	mdPath := filepath.Join(pageDir, slug+".md")
+	const bodyText = "First paragraph from e2e create test."
+	const expectedTitle = "e2e create heading"
+	initial := "# " + expectedTitle + "\n\n" + bodyText + "\n"
+	if err := os.WriteFile(mdPath, []byte(initial), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Push.
+	out, code := runIn(t, dir, "push")
+	if code != 0 {
+		t.Fatalf("push exited %d\noutput:\n%s", code, out)
+	}
+	if !strings.Contains(out, "1 created") {
+		t.Errorf("push output missing '1 created':\n%s", out)
+	}
+
+	// Locate the index entry for the new page so we can clean it up and verify
+	// it via the Notion API.
+	type indexEntry struct {
+		LocalPath string `json:"local_path"`
+		Type      string `json:"type"`
+	}
+	var idx map[string]indexEntry
+	idxData, err := os.ReadFile(filepath.Join(dir, ".nodin", "index.json"))
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	if err := json.Unmarshal(idxData, &idx); err != nil {
+		t.Fatalf("unmarshal index: %v", err)
+	}
+	relPath := filepath.ToSlash(filepath.Join("pages", slug, slug+".md"))
+	var newID string
+	for id, e := range idx {
+		if e.Type == "page" && e.LocalPath == relPath {
+			newID = id
+			break
+		}
+	}
+	if newID == "" {
+		t.Fatalf("no index entry created for %s; index:\n%s", relPath, idxData)
+	}
+	t.Cleanup(func() { _ = client.ArchivePage(context.Background(), newID) })
+
+	// Verify the page exists in Notion with the right title and body.
+	gotPage, err := client.GetPage(context.Background(), newID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	if gotPage.Title() != expectedTitle {
+		t.Errorf("Notion page title = %q, want %q", gotPage.Title(), expectedTitle)
+	}
+
+	// Pull and verify the local file still exists at the user's path with the
+	// expected content (frontmatter + body).
+	if out, code := runIn(t, dir, "pull", "--page", newID); code != 0 {
+		t.Fatalf("pull exited %d\noutput:\n%s", code, out)
+	}
+	if _, err := os.Stat(mdPath); err != nil {
+		t.Errorf("file %s missing after re-pull: %v", relPath, err)
+	}
+	pulled, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("ReadFile after pull: %v", err)
+	}
+	pulledStr := string(pulled)
+	if !strings.Contains(pulledStr, bodyText) {
+		t.Errorf("pulled file missing original body %q:\n%s", bodyText, pulledStr)
+	}
+	if !strings.Contains(pulledStr, "title: "+expectedTitle) {
+		t.Errorf("pulled file missing 'title: %s' frontmatter:\n%s", expectedTitle, pulledStr)
+	}
+
+	// Now edit locally and push again — this should go through the regular
+	// update path (not the create path). Verify Notion picks up the change.
+	const updateLine = "Second paragraph added by e2e test."
+	if err := os.WriteFile(mdPath, []byte(pulledStr+"\n"+updateLine+"\n"), 0644); err != nil {
+		t.Fatalf("WriteFile (edit): %v", err)
+	}
+	out, code = runIn(t, dir, "push")
+	if code != 0 {
+		t.Fatalf("second push exited %d\noutput:\n%s", code, out)
+	}
+	if !strings.Contains(out, "1 pushed") {
+		t.Errorf("second push output missing '1 pushed' (regular update path):\n%s", out)
+	}
+
+	// Final verification via the API: the new paragraph should now be in Notion.
+	blocks, err := client.GetBlocks(context.Background(), newID)
+	if err != nil {
+		t.Fatalf("GetBlocks: %v", err)
+	}
+	var foundUpdate bool
+	for _, b := range blocks {
+		if pc, ok := b.Content.(*notion.ParagraphContent); ok {
+			for _, rt := range pc.RichText {
+				if strings.Contains(rt.PlainText, updateLine) {
+					foundUpdate = true
+				}
+			}
+		}
+	}
+	if !foundUpdate {
+		t.Errorf("update line %q not found in Notion after second push", updateLine)
 	}
 }

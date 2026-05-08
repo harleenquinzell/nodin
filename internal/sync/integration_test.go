@@ -649,3 +649,229 @@ func TestIntegration_Pull_ToggleBlocks(t *testing.T) {
 	}
 }
 
+// TestIntegration_Push_CreateTopLevelPage creates a brand-new local file at
+// pages/<slug>/<slug>.md, runs Push (no prior pull), and verifies that:
+//   - Notion has a new page under RootPageID with the inferred title and body
+//   - the index has an entry pointing at the local path
+//   - the snapshot was written
+func TestIntegration_Push_CreateTopLevelPage(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	slug := "nodin-test-create-" + randSuffix()
+	dir := filepath.Join(cfg.SyncDir, "pages", slug)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	mdPath := filepath.Join(dir, slug+".md")
+	body := "# " + slug + " title\n\nFirst paragraph from create test.\n"
+	if err := os.WriteFile(mdPath, []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	report, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{})
+	if err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+	if report.Created != 1 {
+		t.Fatalf("Created = %d, want 1; report: %+v", report.Created, report)
+	}
+
+	// Locate the index entry for the new page.
+	idx, err := store.ReadIndex()
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	relPath := filepath.ToSlash(filepath.Join("pages", slug, slug+".md"))
+	var newID string
+	for id, e := range idx {
+		if e.Type == "page" && filepath.ToSlash(e.LocalPath) == relPath {
+			newID = id
+			break
+		}
+	}
+	if newID == "" {
+		t.Fatalf("no index entry created for %s", relPath)
+	}
+	t.Cleanup(func() { _ = client.ArchivePage(context.Background(), newID) })
+
+	// Verify Notion has the page with the right title.
+	gotPage, err := client.GetPage(ctx, newID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	wantTitle := slug + " title" // first H1 wins over filename slug
+	if gotPage.Title() != wantTitle {
+		t.Errorf("page title = %q, want %q", gotPage.Title(), wantTitle)
+	}
+	if gotPage.Parent.Type != "page_id" || gotPage.Parent.PageID == "" {
+		t.Errorf("parent = %+v; expected page_id parent", gotPage.Parent)
+	}
+
+	// Verify the body block was appended.
+	gotBlocks, err := client.GetBlocks(ctx, newID)
+	if err != nil {
+		t.Fatalf("GetBlocks: %v", err)
+	}
+	var foundBody bool
+	for _, b := range gotBlocks {
+		if pc, ok := b.Content.(*notion.ParagraphContent); ok {
+			for _, rt := range pc.RichText {
+				if strings.Contains(rt.PlainText, "First paragraph from create test.") {
+					foundBody = true
+				}
+			}
+		}
+	}
+	if !foundBody {
+		t.Errorf("body paragraph not found in created page's blocks")
+	}
+
+	// Verify snapshot was written.
+	snap, err := store.ReadSnapshot(newID)
+	if err != nil || snap == "" {
+		t.Errorf("snapshot for %s: snap=%q err=%v", newID, snap, err)
+	}
+}
+
+// TestIntegration_PushCreate_RoundTrip creates a local file, pushes (creating a
+// new page), then edits it and pushes again to verify the second push goes
+// through the regular update path (Pushed++, not Created++).
+func TestIntegration_PushCreate_RoundTrip(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	slug := "nodin-test-roundtrip-" + randSuffix()
+	dir := filepath.Join(cfg.SyncDir, "pages", slug)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	mdPath := filepath.Join(dir, slug+".md")
+	if err := os.WriteFile(mdPath, []byte("# initial title\n\nfirst body\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	report1, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{})
+	if err != nil {
+		t.Fatalf("first Push: %v", err)
+	}
+	if report1.Created != 1 || report1.Pushed != 0 {
+		t.Fatalf("first Push: Created=%d Pushed=%d, want 1/0", report1.Created, report1.Pushed)
+	}
+
+	idx, _ := store.ReadIndex()
+	relPath := filepath.ToSlash(filepath.Join("pages", slug, slug+".md"))
+	var newID string
+	for id, e := range idx {
+		if e.Type == "page" && filepath.ToSlash(e.LocalPath) == relPath {
+			newID = id
+		}
+	}
+	if newID == "" {
+		t.Fatalf("page not in index after first push")
+	}
+	t.Cleanup(func() { _ = client.ArchivePage(context.Background(), newID) })
+
+	// Edit the local file: append a second paragraph.
+	existing, _ := os.ReadFile(mdPath)
+	updated := string(existing) + "\nsecond paragraph appended\n"
+	if err := os.WriteFile(mdPath, []byte(updated), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	report2, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{})
+	if err != nil {
+		t.Fatalf("second Push: %v", err)
+	}
+	if report2.Pushed != 1 || report2.Created != 0 || report2.Conflicts != 0 {
+		t.Errorf("second Push: Pushed=%d Created=%d Conflicts=%d, want 1/0/0",
+			report2.Pushed, report2.Created, report2.Conflicts)
+	}
+
+	// Verify Notion now has the second paragraph.
+	blocks, err := client.GetBlocks(ctx, newID)
+	if err != nil {
+		t.Fatalf("GetBlocks: %v", err)
+	}
+	var foundSecond bool
+	for _, b := range blocks {
+		if pc, ok := b.Content.(*notion.ParagraphContent); ok {
+			for _, rt := range pc.RichText {
+				if strings.Contains(rt.PlainText, "second paragraph appended") {
+					foundSecond = true
+				}
+			}
+		}
+	}
+	if !foundSecond {
+		t.Errorf("second paragraph not found in Notion after update push")
+	}
+}
+
+// TestIntegration_PushCreate_PreservesPath verifies that after creating a page
+// from a user-chosen filename, a subsequent pull writes back to the SAME file
+// (not the canonical slug path), preventing duplicates.
+func TestIntegration_PushCreate_PreservesPath(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	// Use a filename that won't match the canonical "<slug>-<shortID>" pattern.
+	slug := "nodin-test-path-" + randSuffix()
+	dir := filepath.Join(cfg.SyncDir, "pages", slug)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	mdPath := filepath.Join(dir, slug+".md")
+	if err := os.WriteFile(mdPath, []byte("# preserve path test\n\nbody.\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if _, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{}); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+
+	idx, _ := store.ReadIndex()
+	relPath := filepath.ToSlash(filepath.Join("pages", slug, slug+".md"))
+	var newID string
+	for id, e := range idx {
+		if e.Type == "page" && filepath.ToSlash(e.LocalPath) == relPath {
+			newID = id
+		}
+	}
+	if newID == "" {
+		t.Fatalf("page not in index after push")
+	}
+	t.Cleanup(func() { _ = client.ArchivePage(context.Background(), newID) })
+
+	// Pull this specific page; the file MUST still live at the user's path.
+	if _, err := internalsync.Pull(ctx, cfg, store, client, internalsync.PullOptions{PageID: newID}); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+
+	if _, err := os.Stat(mdPath); err != nil {
+		t.Errorf("user-chosen file %s missing after pull: %v", relPath, err)
+	}
+
+	// And no duplicate at the canonical slug path should exist.
+	canonicalDir := slug + "-" + newID[:8]
+	canonicalPath := filepath.Join(cfg.SyncDir, "pages", canonicalDir, canonicalDir+".md")
+	if _, err := os.Stat(canonicalPath); err == nil {
+		t.Errorf("duplicate canonical-path file written at %s; pull should respect existing index", canonicalPath)
+	}
+}
+

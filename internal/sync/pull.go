@@ -111,13 +111,16 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		return p, ok
 	}
 
-	// Write _schema.json for each database directory.
+	// Write _schema.json for each database directory and record the database in
+	// the index. The index entry lets push resolve the database ID when creating
+	// new entries in that directory.
 	for dbID, schema := range schemas {
 		dbPage, ok := pageMap[dbID]
 		if !ok {
 			continue
 		}
-		dbDir := filepath.Join(cfg.SyncDir, pathmap.DatabasePath(dbPage))
+		dbDirRel := pathmap.DatabasePath(dbPage)
+		dbDir := filepath.Join(cfg.SyncDir, dbDirRel)
 		if err := os.MkdirAll(dbDir, 0755); err != nil {
 			continue
 		}
@@ -125,6 +128,13 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		if err := writeJSONFile(schemaPath, schema); err != nil {
 			continue
 		}
+		_ = store.UpdateEntry(dbID, func(e state.IndexEntry) state.IndexEntry {
+			e.NotionID = dbID
+			e.LocalPath = dbDirRel
+			e.Type = "database"
+			e.LastSync = dbPage.LastEditedTime
+			return e
+		})
 	}
 
 	opts := convert.PullOptions{
@@ -203,9 +213,20 @@ func pullPage(
 		return fmt.Errorf("convert page: %w", err)
 	}
 
-	localPath, err := pathmap.PagePath(page, lookup)
-	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
+	// Prefer an existing index entry's path so pages created locally (with a
+	// user-chosen filename) keep that filename across pulls instead of getting
+	// duplicated under their canonical slug.
+	var localPath string
+	if existing, err := store.ReadIndex(); err == nil {
+		if e, ok := existing[page.ID]; ok && e.LocalPath != "" && e.Type == "page" {
+			localPath = e.LocalPath
+		}
+	}
+	if localPath == "" {
+		localPath, err = pathmap.PagePath(page, lookup)
+		if err != nil {
+			return fmt.Errorf("resolve path: %w", err)
+		}
 	}
 	absPath := filepath.Join(cfg.SyncDir, localPath)
 

@@ -31,6 +31,38 @@ func (c *Client) CreatePage(ctx context.Context, parentID, title string) (*Page,
 	return &page, nil
 }
 
+// CreatePageInDatabase creates a new entry in the database identified by dbID.
+// titleProp is the schema name of the database's title column (e.g. "Name").
+// props are additional editable properties to set; computed properties are skipped.
+func (c *Client) CreatePageInDatabase(ctx context.Context, dbID, titleProp, title string, props map[string]PropertyValue) (*Page, error) {
+	apiProps := map[string]any{
+		titleProp: map[string]any{
+			"title": []map[string]any{
+				{"type": "text", "text": map[string]any{"content": title}},
+			},
+		},
+	}
+	for name, pv := range props {
+		if pv.Computed || name == titleProp {
+			continue
+		}
+		apiProps[name] = propertyValueToAPI(pv)
+	}
+	body := map[string]any{
+		"parent":     map[string]any{"type": "database_id", "database_id": normalizeID(dbID)},
+		"properties": apiProps,
+	}
+	data, err := c.do(ctx, "POST", "/pages", body)
+	if err != nil {
+		return nil, fmt.Errorf("create database entry: %w", err)
+	}
+	var page Page
+	if err := json.Unmarshal(data, &page); err != nil {
+		return nil, fmt.Errorf("parse created entry: %w", err)
+	}
+	return &page, nil
+}
+
 // GetPage fetches a Notion page by ID.
 // Accepts both hyphenated and unhyphenated UUIDs.
 func (c *Client) GetPage(ctx context.Context, id string) (*Page, error) {
