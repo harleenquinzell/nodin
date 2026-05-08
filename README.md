@@ -4,7 +4,7 @@ A CLI for syncing Notion pages to and from local markdown files.
 
 I don't want to get out of the terminal, so Notion is not my usual go to doc tool, but sometimes we don't have control over that.
 
-I tried other notion sync tools out there, but none that fit my ways of working, as they usually assume a winner when there's conflicts, and the other edit is silently lost. Nodin does a proper three-way merge instead, using the last-synced snapshot as the base and writing `<<<<<<<` conflict markers to the file when it can't resolve things automatically.
+I tried other notion sync tools out there, but none that fit my ways of working, as they usually assume a winner when there's conflicts, and the other edit is silently lost. Nodin does a three-way merge, using the last-synced snapshot as the base and writing `<<<<<<<` conflict markers to the file when it can't resolve things automatically.
 
 ## Install
 
@@ -16,6 +16,7 @@ Then make sure Go's bin directory is on your path (add this to your `~/.bashrc` 
 
 ```sh
 export PATH="$PATH:$HOME/go/bin"
+# or whatever your go path is. if unsure, run `which go`, it should tell you.
 ```
 
 Or from source:
