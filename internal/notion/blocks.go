@@ -386,24 +386,55 @@ func NewEquationRichText(expr string) RichText {
 }
 
 // GetBlocks fetches all blocks under parentID, recursively expanding children.
+// Child fetches for blocks that need them are issued concurrently (up to 4 at a
+// time) so pages with many toggles or nested lists don't stall on the rate limiter.
 func (c *Client) GetBlocks(ctx context.Context, parentID string) ([]Block, error) {
 	blocks, err := c.getBlocksPage(ctx, parentID)
 	if err != nil {
 		return nil, err
 	}
+
+	type result struct {
+		idx      int
+		children []Block
+		err      error
+	}
+
+	// Collect indices that need a children fetch.
+	var needFetch []int
 	for i := range blocks {
-		if !blocks[i].HasChildren && !alwaysFetchChildren(blocks[i]) {
-			continue
-		}
-		children, err := c.GetBlocks(ctx, blocks[i].ID)
-		if err != nil {
-			return nil, fmt.Errorf("get children of %s: %w", blocks[i].ID, err)
-		}
-		blocks[i].Children = children
-		if len(children) > 0 {
-			blocks[i].HasChildren = true
+		if blocks[i].HasChildren || alwaysFetchChildren(blocks[i]) {
+			needFetch = append(needFetch, i)
 		}
 	}
+	if len(needFetch) == 0 {
+		return blocks, nil
+	}
+
+	results := make(chan result, len(needFetch))
+	sem := make(chan struct{}, 4) // max 4 concurrent child fetches per level
+
+	for _, i := range needFetch {
+		i := i
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem }()
+			children, err := c.GetBlocks(ctx, blocks[i].ID)
+			results <- result{idx: i, children: children, err: err}
+		}()
+	}
+
+	for range needFetch {
+		r := <-results
+		if r.err != nil {
+			return nil, fmt.Errorf("get children of %s: %w", blocks[r.idx].ID, r.err)
+		}
+		blocks[r.idx].Children = r.children
+		if len(r.children) > 0 {
+			blocks[r.idx].HasChildren = true
+		}
+	}
+
 	return blocks, nil
 }
 

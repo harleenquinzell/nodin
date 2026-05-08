@@ -553,3 +553,99 @@ func TestIntegration_Push_Delete(t *testing.T) {
 	}
 }
 
+// TestIntegration_Pull_ToggleBlocks creates a page containing a toggle block
+// (with children) and a toggleable heading (with children appended after
+// creation), then pulls and verifies both render with their child content.
+//
+// Note: programmatically-created toggles have has_children=true so the
+// force-fetch path is not exercised here — that is covered by the mock-server
+// unit tests. This test validates the full pull→convert pipeline end-to-end.
+func TestIntegration_Pull_ToggleBlocks(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	title := "nodin-test-toggles-" + randSuffix()
+	testPage := createTestPage(t, ctx, client, cfg.RootPageID, title)
+
+	// Append a toggle block with one child paragraph inline.
+	_, err := client.AppendBlocks(ctx, testPage.ID, []notion.Block{
+		{
+			Type: "toggle",
+			Content: &notion.ToggleContent{
+				RichText: []notion.RichText{notion.NewRichText("Toggle header")},
+			},
+			Children: []notion.Block{
+				{
+					Type:    "paragraph",
+					Content: &notion.ParagraphContent{RichText: []notion.RichText{notion.NewRichText("Toggle child content")}},
+				},
+			},
+		},
+	}, "")
+	if err != nil {
+		t.Fatalf("AppendBlocks (toggle): %v", err)
+	}
+
+	// Append a toggleable heading (H2 with is_toggleable=true).
+	headings, err := client.AppendBlocks(ctx, testPage.ID, []notion.Block{
+		{
+			Type: "heading_2",
+			Content: &notion.HeadingContent{
+				RichText:     []notion.RichText{notion.NewRichText("Toggleable heading")},
+				IsToggleable: true,
+				Level:        2,
+			},
+		},
+	}, "")
+	if err != nil {
+		t.Fatalf("AppendBlocks (heading): %v", err)
+	}
+
+	// Append a child paragraph to the toggleable heading.
+	if _, err := client.AppendBlocks(ctx, headings[0].ID, []notion.Block{
+		{
+			Type:    "paragraph",
+			Content: &notion.ParagraphContent{RichText: []notion.RichText{notion.NewRichText("Heading child content")}},
+		},
+	}, ""); err != nil {
+		t.Fatalf("AppendBlocks (heading child): %v", err)
+	}
+
+	// Pull the page.
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+	if _, err := internalsync.Pull(ctx, cfg, store, client, internalsync.PullOptions{PageID: testPage.ID}); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+
+	idx, err := store.ReadIndex()
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	entry, ok := idx[testPage.ID]
+	if !ok {
+		t.Fatal("test page not in index after pull")
+	}
+	md, err := os.ReadFile(filepath.Join(cfg.SyncDir, entry.LocalPath))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	body := string(md)
+
+	// Toggle block must render as <details>/<summary> with child text inside.
+	for _, want := range []string{"<details>", "Toggle header", "Toggle child content"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("toggle block: %q not found in pulled markdown:\n%s", want, body)
+		}
+	}
+
+	// Toggleable heading must render with its child text below it.
+	for _, want := range []string{"## Toggleable heading", "Heading child content"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("toggleable heading: %q not found in pulled markdown:\n%s", want, body)
+		}
+	}
+}
+

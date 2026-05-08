@@ -13,7 +13,7 @@ test:
 
 test-integration:
 	@cd $(ROOT) && bash -c 'set -a; [ -f .env ] && source .env; set +a; \
-		go test -tags integration -timeout 60s -v ./internal/sync/ ./internal/notion/'
+		go test -tags integration -timeout 300s -v ./internal/sync/ ./internal/notion/'
 
 lint:
 	cd $(ROOT) && go vet ./...
