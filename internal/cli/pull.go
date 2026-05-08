@@ -55,7 +55,14 @@ func newPullCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
-			pullOpts := internalsync.PullOptions{PageID: pageID, Since: sinceTime}
+			out := cmd.OutOrStdout()
+			pullOpts := internalsync.PullOptions{
+				PageID: pageID,
+				Since:  sinceTime,
+				Progress: func(done, total int, localPath string) {
+					fmt.Fprintf(out, "  [%d/%d] %s\n", done, total, localPath)
+				},
+			}
 			report, err := internalsync.Pull(ctx, cfg, store, client, pullOpts)
 			if err != nil {
 				return err

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -31,6 +32,9 @@ type PullOptions struct {
 	// Since, if non-zero, overrides the stored LastSync cursor for this run.
 	// The stored cursor is not updated when this is set.
 	Since time.Time
+	// Progress, if set, is called after each page is successfully written to disk.
+	// done is the number of pages completed so far; total is the full count for this run.
+	Progress func(done, total int, localPath string)
 }
 
 // PullReport summarises the results of a pull.
@@ -130,13 +134,22 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 
 	report := &PullReport{}
 
+	total := len(pages)
+	var doneCount atomic.Int32
+	notifyProgress := func(localPath string) {
+		if pullOpts.Progress != nil {
+			n := int(doneCount.Add(1))
+			pullOpts.Progress(n, total, localPath)
+		}
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(cfg.Concurrency)
 
 	for _, page := range pages {
 		page := page // capture
 		g.Go(func() error {
-			if err := pullPage(ctx, cfg, store, client, page, lookup, opts, report); err != nil {
+			if err := pullPage(ctx, cfg, store, client, page, lookup, opts, report, notifyProgress); err != nil {
 				return fmt.Errorf("pull page %s: %w", page.ID, err)
 			}
 			return nil
@@ -178,6 +191,7 @@ func pullPage(
 	lookup func(string) (notion.Page, bool),
 	opts convert.PullOptions,
 	report *PullReport,
+	notify func(localPath string),
 ) error {
 	blocks, err := client.GetBlocks(ctx, page.ID)
 	if err != nil {
@@ -279,6 +293,9 @@ func pullPage(
 	report.Pages = append(report.Pages, localPath)
 	report.mu.Unlock()
 
+	if notify != nil {
+		notify(localPath)
+	}
 	return nil
 }
 
