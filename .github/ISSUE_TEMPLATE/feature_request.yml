@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an enhancement or new capability.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening this, consider whether it might be a discussion instead — broader "what if nodin could…" conversations belong in Discussions, while concrete proposals fit here.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that nodin makes hard or impossible today?
+      placeholder: |
+        I want to … but currently I have to …
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like nodin to handle this? Sketch a CLI command, config option, or behavior change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you've tried, or other tools that solve this differently.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, screenshots, links to related issues.

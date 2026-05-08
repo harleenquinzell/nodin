@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/harleenquinzell/nodin/discussions
+    about: For "how do I…?", design discussions, or anything that isn't a bug or concrete feature request, please open a discussion instead.

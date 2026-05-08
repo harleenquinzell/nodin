@@ -1,0 +1,75 @@
+name: Bug report
+description: Something is broken or behaving differently than documented.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.
+
+        Before submitting, please make sure your token is **redacted** from any logs or output you paste below. nodin redacts tokens in its own error messages, but not from anything you copy out of your shell.
+
+  - type: input
+    id: version
+    attributes:
+      label: nodin version
+      description: Output of `nodin --version`. If you built from source, paste the commit SHA.
+      placeholder: "v0.1.0 or git sha"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the unexpected behavior. Include exact commands run.
+      placeholder: |
+        Ran `nodin pull` and ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal sequence of commands or actions someone else can follow to see the bug.
+      placeholder: |
+        1. nodin init
+        2. Create page X in Notion with ...
+        3. nodin pull
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Paste error messages, stack traces, or `nodin doctor` output. **Redact your token.**
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Workspace shape (number of pages, databases), unusual block types, anything that might be relevant.
