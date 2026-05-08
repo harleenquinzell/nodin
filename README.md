@@ -1,5 +1,10 @@
 # nodin
 
+[![CI](https://github.com/harleenquinzell/nodin/actions/workflows/ci.yml/badge.svg)](https://github.com/harleenquinzell/nodin/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/harleenquinzell/nodin)](https://goreportcard.com/report/github.com/harleenquinzell/nodin)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/harleenquinzell/nodin)](go.mod)
+[![License: MIT](https://img.shields.io/github/license/harleenquinzell/nodin)](LICENSE)
+
 A CLI for syncing Notion pages to and from local markdown files.
 
 I don't want to get out of the terminal, so Notion is not my usual go to doc tool, but sometimes we don't have control over that.
