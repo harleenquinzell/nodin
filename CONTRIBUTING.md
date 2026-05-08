@@ -26,6 +26,13 @@ make test-integration  # integration tests against a real Notion workspace
 
 For integration tests, copy `.env.example` to `.env` and fill in `NODIN_TEST_TOKEN` (a Notion integration token) and `NODIN_TEST_PAGE_ID` (a page the token can freely write under). The Makefile sources `.env` automatically. Tests create and clean up their own pages prefixed `nodin-test-` and are safe to run repeatedly.
 
+## CI on pull requests
+
+- **PRs from branches in this repo** run the full CI (unit + integration + e2e tests).
+- **PRs from forks** run unit tests only, as GitHub does not expose secrets to fork workflows. This means that before merging an external PR, I personally will pull the changes into a branch in this repo to run the full suite.
+
+If you're contributing from a fork and want to verify integration tests pass before opening the PR, set up your own Notion test workspace and run `make test-integration` locally.
+
 ## Coding conventions
 
 - No testify; stdlib `testing` + `t.Helper()` only.
