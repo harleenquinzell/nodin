@@ -1,5 +1,12 @@
 # Contributing to nodin
 
+## Use of Generative AI
+
+PRs for contributing should come from humans, not agents.
+If you want to use GenAI on your workflow, that is fine.
+But I don't want PRs opened by agents roaming around Github repos,
+looking for something to contribute.
+
 ## Adding a new block type
 
 1. Add a fixture pair in `internal/convert/testdata/`:
