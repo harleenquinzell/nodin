@@ -1,0 +1,39 @@
+[
+  {
+    "id": "aaa00030-0000-0000-0000-000000000001",
+    "type": "heading_2",
+    "has_children": false,
+    "heading_2": {
+      "rich_text": [
+        {
+          "type": "text",
+          "plain_text": "Collapsible section",
+          "href": null,
+          "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+          "text": {"content": "Collapsible section", "link": null}
+        }
+      ],
+      "color": "default",
+      "is_toggleable": true
+    },
+    "children": [
+      {
+        "id": "aaa00030-0000-0000-0000-000000000002",
+        "type": "paragraph",
+        "has_children": false,
+        "paragraph": {
+          "rich_text": [
+            {
+              "type": "text",
+              "plain_text": "Content under the toggleable heading.",
+              "href": null,
+              "annotations": {"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},
+              "text": {"content": "Content under the toggleable heading.", "link": null}
+            }
+          ],
+          "color": "default"
+        }
+      }
+    ]
+  }
+]

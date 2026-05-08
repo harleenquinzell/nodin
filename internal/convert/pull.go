@@ -148,7 +148,15 @@ func pullBlock(b notion.Block, opts PullOptions, seq int) (string, []AssetRef, e
 	case *notion.HeadingContent:
 		prefix := strings.Repeat("#", c.Level)
 		text := RenderRichText(c.RichText)
-		return prefix + " " + text + "\n\n", nil, nil
+		result := prefix + " " + text + "\n\n"
+		if c.IsToggleable && b.HasChildren && len(b.Children) > 0 {
+			childMD, _, err := pullBlocks(b.Children, opts, false)
+			if err != nil {
+				return "", nil, err
+			}
+			result += childMD
+		}
+		return result, nil, nil
 
 	case *notion.ListItemContent:
 		text := RenderRichText(c.RichText)

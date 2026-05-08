@@ -392,7 +392,7 @@ func (c *Client) GetBlocks(ctx context.Context, parentID string) ([]Block, error
 		return nil, err
 	}
 	for i := range blocks {
-		if !blocks[i].HasChildren {
+		if !blocks[i].HasChildren && !alwaysFetchChildren(blocks[i]) {
 			continue
 		}
 		children, err := c.GetBlocks(ctx, blocks[i].ID)
@@ -400,8 +400,26 @@ func (c *Client) GetBlocks(ctx context.Context, parentID string) ([]Block, error
 			return nil, fmt.Errorf("get children of %s: %w", blocks[i].ID, err)
 		}
 		blocks[i].Children = children
+		if len(children) > 0 {
+			blocks[i].HasChildren = true
+		}
 	}
 	return blocks, nil
+}
+
+// alwaysFetchChildren reports whether a block's children should be fetched even
+// when has_children is false. Notion can return has_children=false for collapsed
+// toggle blocks even when they contain content, so we force-fetch those.
+func alwaysFetchChildren(b Block) bool {
+	switch b.Type {
+	case "toggle":
+		return true
+	case "heading_1", "heading_2", "heading_3":
+		if c, ok := b.Content.(*HeadingContent); ok {
+			return c.IsToggleable
+		}
+	}
+	return false
 }
 
 // getBlocksPage fetches one paginated level of children.
