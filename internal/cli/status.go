@@ -29,12 +29,16 @@ func newStatusCmd() *cobra.Command {
 			}
 
 			modified := 0
+			conflicted := 0
 			deleted := 0
 			for _, e := range entries {
 				switch e.Status {
 				case internalsync.FileModified:
 					modified++
 					cmd.Printf("M  %s\n", e.LocalPath)
+				case internalsync.FileConflicted:
+					conflicted++
+					cmd.Printf("C  %s\n", e.LocalPath)
 				case internalsync.FileDeleted:
 					deleted++
 					cmd.Printf("D  %s\n", e.LocalPath)
@@ -45,10 +49,10 @@ func newStatusCmd() *cobra.Command {
 				}
 			}
 
-			if modified+deleted == 0 {
+			if modified+conflicted+deleted == 0 {
 				cmd.Println("nothing to push")
 			} else {
-				cmd.Printf("\n%d modified, %d deleted\n", modified, deleted)
+				cmd.Printf("\n%d modified, %d conflicted, %d deleted\n", modified, conflicted, deleted)
 			}
 			return nil
 		},

@@ -45,18 +45,29 @@ func newPushCmd() *cobra.Command {
 					return fmt.Errorf("status: %w", err)
 				}
 				n := 0
+				conflicts := 0
 				for _, e := range entries {
-					if e.Status == internalsync.FileModified || e.Status == internalsync.FileDeleted {
-						if resolvedPage == "" || e.NotionID == resolvedPage || e.LocalPath == resolvedPage {
-							cmd.Printf("  %s  %s\n", e.Status, e.LocalPath)
-							n++
-						}
+					if resolvedPage != "" && e.NotionID != resolvedPage && e.LocalPath != resolvedPage {
+						continue
+					}
+					switch e.Status {
+					case internalsync.FileModified, internalsync.FileDeleted:
+						cmd.Printf("  %s  %s\n", e.Status, e.LocalPath)
+						n++
+					case internalsync.FileConflicted:
+						cmd.Printf("  conflict  %s  (resolve markers first)\n", e.LocalPath)
+						conflicts++
 					}
 				}
-				if n == 0 {
+				if n == 0 && conflicts == 0 {
 					cmd.Println("dry-run: nothing to push")
 				} else {
-					cmd.Printf("dry-run: %d page(s) would be pushed\n", n)
+					if n > 0 {
+						cmd.Printf("dry-run: %d page(s) would be pushed\n", n)
+					}
+					if conflicts > 0 {
+						cmd.Printf("dry-run: %d page(s) have unresolved conflicts\n", conflicts)
+					}
 				}
 				return nil
 			}

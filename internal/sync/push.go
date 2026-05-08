@@ -89,6 +89,12 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 			report.mu.Unlock()
 			continue
 		}
+		if strings.Contains(localContent, "<<<<<<<") {
+			report.mu.Lock()
+			report.Conflicts++
+			report.mu.Unlock()
+			continue
+		}
 
 		g.Go(func() error {
 			if err := pushPage(ctx, cfg.SyncDir, store, client, opts, id, entry, localContent, report); err != nil {

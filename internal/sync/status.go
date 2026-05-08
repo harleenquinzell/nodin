@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/harleenquinzell/nodin/internal/config"
 	"github.com/harleenquinzell/nodin/internal/state"
@@ -13,15 +14,18 @@ import (
 type FileStatus int
 
 const (
-	FileClean    FileStatus = iota // local matches last-synced checksum
-	FileModified                   // local differs from last-synced checksum
-	FileDeleted                    // local file no longer exists
+	FileClean      FileStatus = iota // local matches last-synced checksum
+	FileModified                     // local differs from last-synced checksum
+	FileConflicted                   // local contains unresolved conflict markers
+	FileDeleted                      // local file no longer exists
 )
 
 func (s FileStatus) String() string {
 	switch s {
 	case FileModified:
 		return "modified"
+	case FileConflicted:
+		return "conflicted"
 	case FileDeleted:
 		return "deleted"
 	default:
@@ -56,6 +60,8 @@ func Status(cfg *config.Config, store *state.Store) ([]StatusEntry, error) {
 		switch {
 		case readErr != nil:
 			status = FileDeleted
+		case strings.Contains(string(data), "<<<<<<<"):
+			status = FileConflicted
 		case checksum(string(data)) != entry.Checksum:
 			status = FileModified
 		default:
