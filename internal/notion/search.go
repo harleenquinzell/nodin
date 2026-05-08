@@ -11,6 +11,8 @@ import (
 type SearchOpts struct {
 	// Filter limits results by object type: "page", "database", or "" for both.
 	Filter string
+	// Query is a text search string matched against page titles.
+	Query  string
 	Cursor string
 	Limit  int // page_size; 0 → API default (100)
 }
@@ -29,6 +31,9 @@ func (c *Client) Search(ctx context.Context, opts SearchOpts) (*SearchResponse, 
 			"direction": "descending",
 			"timestamp": "last_edited_time",
 		},
+	}
+	if opts.Query != "" {
+		body["query"] = opts.Query
 	}
 	if opts.Filter != "" {
 		body["filter"] = map[string]string{
