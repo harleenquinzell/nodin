@@ -12,6 +12,12 @@ I tried other notion sync tools out there, but none that fit my ways of working,
 go install github.com/harleenquinzell/nodin/cmd/nodin@latest
 ```
 
+Then make sure Go's bin directory is on your path (add this to your `~/.bashrc` or `~/.zshrc`):
+
+```sh
+export PATH="$PATH:$HOME/go/bin"
+```
+
 Or from source:
 
 ```sh
