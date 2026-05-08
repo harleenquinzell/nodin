@@ -88,6 +88,8 @@ make help            # list all targets
 
 The Makefile works from any directory. For integration tests, copy `.env.example` to `.env` and fill in your values first.
 
+If you want to contribute but don't know with what, I keep a list of improvements I want to make in the Issues, check it out!
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 
 ## License
