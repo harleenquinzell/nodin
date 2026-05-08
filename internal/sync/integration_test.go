@@ -326,12 +326,9 @@ func TestIntegration_Push_Conflict(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	// Sleep so the next API write lands in a new second, ensuring
-	// remotePage.LastEditedTime > entry.LastSync on the push check.
-	time.Sleep(1200 * time.Millisecond)
-
-	// Update the same block via the Notion API to a third value.
-	// This advances the page's LastEditedTime, triggering the conflict guard.
+	// Update the same block via the Notion API to a third value (the "remote" edit).
+	// The conflict guard no longer relies on page.last_edited_time (Notion does not
+	// propagate block edits to the parent page's timestamp), so no sleep is needed.
 	remoteBlock := notion.Block{
 		ID:   seededBlocks[0].ID,
 		Type: "paragraph",
@@ -345,7 +342,7 @@ func TestIntegration_Push_Conflict(t *testing.T) {
 		t.Fatalf("UpdateBlock: %v", err)
 	}
 
-	// Push: conflict guard should detect divergence, write markers, skip the push.
+	// Push: conflict guard fetches remote blocks, sees divergence, writes markers.
 	report, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{PageID: testPage.ID})
 	if err != nil {
 		t.Fatalf("Push: %v", err)
@@ -555,3 +552,4 @@ func TestIntegration_Push_Delete(t *testing.T) {
 		}
 	}
 }
+

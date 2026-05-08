@@ -134,39 +134,40 @@ func pushPage(
 		return fmt.Errorf("no snapshot for %s; run 'nodin pull' first", notionID)
 	}
 
-	// Concurrent-edit guard: if Notion has been edited since our last sync,
-	// fetch the current remote state and do a three-way merge before pushing.
+	// Concurrent-edit guard: always fetch the current remote state and do a
+	// three-way merge before pushing. We cannot rely on page.last_edited_time
+	// to detect block-level changes — Notion does not propagate block edits to
+	// the parent page's last_edited_time. The merge is a no-op when remote
+	// matches the snapshot, so the only overhead is one extra GetBlocks call.
 	remotePage, err := client.GetPage(ctx, notionID)
 	if err != nil {
 		return fmt.Errorf("get page: %w", err)
 	}
 
-	if remotePage.LastEditedTime.After(entry.LastSync) {
-		remoteBlocks, err := client.GetBlocks(ctx, notionID)
-		if err != nil {
-			return fmt.Errorf("get remote blocks: %w", err)
-		}
-		converted, err := convert.PullPage(*remotePage, remoteBlocks, opts)
-		if err != nil {
-			return fmt.Errorf("convert remote: %w", err)
-		}
-		remoteMD := converted.Frontmatter + converted.Body
+	remoteBlocks, err := client.GetBlocks(ctx, notionID)
+	if err != nil {
+		return fmt.Errorf("get remote blocks: %w", err)
+	}
+	converted, err := convert.PullPage(*remotePage, remoteBlocks, opts)
+	if err != nil {
+		return fmt.Errorf("convert remote: %w", err)
+	}
+	remoteMD := converted.Frontmatter + converted.Body
 
-		result, mergeErr := merge.ThreeWay(snapshot, localContent, remoteMD)
-		if mergeErr != nil {
-			// git unavailable; use local content as-is and risk overwriting remote changes.
-		} else if result.Conflicts {
-			absPath := filepath.Join(syncDir, entry.LocalPath)
-			if err := writeFileAtomic(absPath, result.Content); err != nil {
-				return fmt.Errorf("write conflict markers: %w", err)
-			}
-			report.mu.Lock()
-			report.Conflicts++
-			report.mu.Unlock()
-			return nil
-		} else {
-			localContent = result.Content
+	result, mergeErr := merge.ThreeWay(snapshot, localContent, remoteMD)
+	if mergeErr != nil {
+		// git unavailable; use local content as-is and risk overwriting remote changes.
+	} else if result.Conflicts {
+		absPath := filepath.Join(syncDir, entry.LocalPath)
+		if err := writeFileAtomic(absPath, result.Content); err != nil {
+			return fmt.Errorf("write conflict markers: %w", err)
 		}
+		report.mu.Lock()
+		report.Conflicts++
+		report.mu.Unlock()
+		return nil
+	} else {
+		localContent = result.Content
 	}
 
 	// Parse local markdown → blocks.
