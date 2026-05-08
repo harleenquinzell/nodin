@@ -63,7 +63,7 @@ func newPullCmd() *cobra.Command {
 
 			cmd.Printf("pull: %s\n", report.Summary())
 			if report.Conflicts > 0 {
-				return fmt.Errorf("%d conflict(s); resolve and re-run push", report.Conflicts)
+				return ErrConflicts
 			}
 			return nil
 		},

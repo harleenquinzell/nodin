@@ -76,6 +76,9 @@ func newPushCmd() *cobra.Command {
 			}
 
 			cmd.Printf("push: %s\n", report.Summary())
+			if report.Conflicts > 0 {
+				return ErrConflicts
+			}
 			return nil
 		},
 	}

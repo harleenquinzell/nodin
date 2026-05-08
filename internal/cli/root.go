@@ -1,8 +1,14 @@
 package cli
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 )
+
+// ErrConflicts is returned by pull/push when the run completed but left
+// conflict markers in one or more files. main maps this to exit code 1.
+var ErrConflicts = errors.New("conflicts")
 
 // shared flag values, set by persistent flags on the root command.
 var (
