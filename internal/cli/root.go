@@ -21,7 +21,7 @@ func NewRootCmd(version string) *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	root.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "config file (default: ~/.config/nodin/config.toml)")
+	root.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "config file (default: .nodin.toml, walking up to ~/.config/nodin/config.toml)")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
 	root.AddCommand(

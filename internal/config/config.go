@@ -42,6 +42,9 @@ type tomlFile struct {
 	Sync tomlSync `toml:"sync"`
 }
 
+// LocalConfigName is the filename nodin looks for when discovering a workspace config.
+const LocalConfigName = ".nodin.toml"
+
 // DefaultPath returns ~/.config/nodin/config.toml.
 func DefaultPath() string {
 	home, err := os.UserHomeDir()
@@ -51,11 +54,36 @@ func DefaultPath() string {
 	return filepath.Join(home, ".config", "nodin", "config.toml")
 }
 
-// Load reads config from path (empty → DefaultPath) then applies env overrides.
+// Discover walks up from the current directory looking for a .nodin.toml file.
+// Falls back to DefaultPath if none is found.
+func Discover() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return DefaultPath()
+	}
+	dir := cwd
+	for {
+		candidate := filepath.Join(dir, LocalConfigName)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break // reached filesystem root
+		}
+		dir = parent
+	}
+	return DefaultPath()
+}
+
+// Load reads config from path (empty → Discover) then applies env overrides.
 // Missing file is not an error; callers should call Validate before use.
+// When a local .nodin.toml is discovered and sync_dir is not set, it defaults
+// to the directory containing the config file.
 func Load(path string) (*Config, error) {
+	local := path == ""
 	if path == "" {
-		path = DefaultPath()
+		path = Discover()
 	}
 
 	c := &Config{
@@ -72,6 +100,15 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(c)
+
+	// For a discovered local config, default sync_dir to the directory
+	// containing the config file so each workspace is self-contained.
+	if local && c.SyncDir == "" && path != DefaultPath() {
+		if abs, err := filepath.Abs(filepath.Dir(path)); err == nil {
+			c.SyncDir = abs
+		}
+	}
+
 	return c, nil
 }
 

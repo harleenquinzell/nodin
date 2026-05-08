@@ -32,7 +32,14 @@ directory, and optionally runs git init.`,
 func runInit(cmd *cobra.Command, _ []string) error {
 	r := bufio.NewReader(os.Stdin)
 
+	// sync dir is always the current directory
+	syncDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
 	fmt.Println("nodin init")
+	fmt.Printf("Workspace directory: %s\n", syncDir)
 	fmt.Println()
 
 	// token
@@ -71,30 +78,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 	fmt.Printf("ok (%q)\n", page.Title())
 
-	// sync dir
-	home, _ := os.UserHomeDir()
-	defaultSyncDir := filepath.Join(home, "notion")
-	fmt.Printf("Local sync directory [%s]: ", defaultSyncDir)
-	syncDir, err := readLine(r)
-	if err != nil {
-		return fmt.Errorf("read sync dir: %w", err)
-	}
-	if syncDir == "" {
-		syncDir = defaultSyncDir
-	}
-	if !filepath.IsAbs(syncDir) {
-		abs, err := filepath.Abs(syncDir)
-		if err != nil {
-			return fmt.Errorf("resolve sync dir: %w", err)
-		}
-		syncDir = abs
-	}
-
 	// scaffold sync dir
-	if err := os.MkdirAll(syncDir, 0755); err != nil {
-		return fmt.Errorf("create sync dir: %w", err)
-	}
-
 	store := state.Open(syncDir)
 	if err := store.Init(); err != nil {
 		return err
@@ -103,10 +87,10 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	// git init
 	if _, err := exec.LookPath("git"); err == nil {
 		if _, err := os.Stat(filepath.Join(syncDir, ".git")); os.IsNotExist(err) {
-			cmd := exec.Command("git", "-C", syncDir, "init")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+			gitCmd := exec.Command("git", "-C", syncDir, "init")
+			gitCmd.Stdout = os.Stdout
+			gitCmd.Stderr = os.Stderr
+			if err := gitCmd.Run(); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: git init failed: %v\n", err)
 			}
 		}
@@ -117,17 +101,17 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// config
+	// write .nodin.toml in the current directory (sync_dir is intentionally
+	// omitted — it defaults to the directory containing the config file)
 	c := &config.Config{
 		Token:          token,
 		RootPageID:     rootPageID,
-		SyncDir:        syncDir,
 		RPS:            3,
 		Concurrency:    4,
 		AutoCommit:     true,
 		DownloadAssets: true,
 	}
-	destCfg := config.DefaultPath()
+	destCfg := filepath.Join(syncDir, config.LocalConfigName)
 	if err := config.Write(destCfg, c); err != nil {
 		return err
 	}
@@ -136,8 +120,8 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	fmt.Printf("Config written to %s\n", destCfg)
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Printf("  nodin doctor     — verify everything is working\n")
-	fmt.Printf("  nodin pull       — pull your Notion pages to %s\n", syncDir)
+	fmt.Printf("  nodin doctor   — verify everything is working\n")
+	fmt.Printf("  nodin pull     — pull your Notion pages into %s\n", syncDir)
 	return nil
 }
 

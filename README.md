@@ -25,11 +25,20 @@ Requires Go 1.22+ and `git` (only needed for auto-commit, which you can turn off
 ## Getting started
 
 ```sh
-nodin init      # walks you through token, root page, and sync directory
+cd ~/my-notion-workspace
+nodin init      # prompts for token and root page, writes .nodin.toml here
 nodin doctor    # checks your config and connectivity
+nodin pull      # sync Notion → local
 ```
 
-Config lives at `~/.config/nodin/config.toml`. You can also set `NODIN_TOKEN` and `NODIN_ROOT_PAGE_ID` as env vars and skip the file entirely.
+nodin looks for `.nodin.toml` starting in the current directory and walking up, so you can have multiple independent workspaces:
+
+```
+~/work/docs/          ← nodin init here → syncs work Notion
+~/personal/notes/     ← nodin init here → syncs personal Notion
+```
+
+You can also set `NODIN_TOKEN` and `NODIN_ROOT_PAGE_ID` as env vars, or use `--config` to point at a specific file.
 
 ## Commands
 
