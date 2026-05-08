@@ -39,6 +39,13 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 	fmt.Println("nodin doctor")
 	fmt.Println()
 
+	// Resolve the config file path the same way Load does, so we can check
+	// its permissions below.
+	resolvedCfgPath := cfgPath
+	if resolvedCfgPath == "" {
+		resolvedCfgPath = config.Discover()
+	}
+
 	// 1. Config
 	var c *config.Config
 	var cfgErr error
@@ -55,10 +62,26 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("doctor: checks failed")
 	}
 
+	// 2. Config file permissions — warn if inline token is world/group readable.
+	check("config file permissions", func() error {
+		if c.Token == "" {
+			return nil // token comes from env or token_file; skip
+		}
+		info, err := os.Stat(resolvedCfgPath)
+		if err != nil {
+			return nil // env-only config; no file to check
+		}
+		if perm := info.Mode().Perm(); perm&0077 != 0 {
+			return fmt.Errorf("%s is %04o; should be 0600 (token readable by others)",
+				filepath.Base(resolvedCfgPath), perm)
+		}
+		return nil
+	})
+
 	token, _ := c.ResolvedToken()
 	client := notion.NewClient(token, c.RPS)
 
-	// 2. git (only if AutoCommit)
+	// 3. git (only if AutoCommit)
 	if c.AutoCommit {
 		check("git is available", func() error {
 			_, err := exec.LookPath("git")
@@ -69,13 +92,13 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	// 3. Token authenticates
+	// 4. Token authenticates
 	check("token authenticates", func() error {
 		_, err := client.Search(cmd.Context(), notion.SearchOpts{Limit: 1})
 		return err
 	})
 
-	// 4. Root page accessible
+	// 5. Root page accessible
 	var rootPage *notion.Page
 	check("root page accessible", func() error {
 		var err error
@@ -83,7 +106,7 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 		return err
 	})
 
-	// 5. Root is a page, not a database
+	// 6. Root is a page, not a database
 	if rootPage != nil {
 		check("root is a page (not a database)", func() error {
 			if rootPage.Object != "page" {
@@ -93,7 +116,7 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	// 6. SyncDir (if set)
+	// 7. SyncDir (if set)
 	if c.SyncDir != "" {
 		check("sync_dir exists and is writable", func() error {
 			if _, err := os.Stat(c.SyncDir); err != nil {
@@ -117,10 +140,17 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 			})
 		}
 
-		check(".nodin/ is accessible", func() error {
+		check(".nodin/ is accessible with safe permissions", func() error {
 			nodinPath := filepath.Join(c.SyncDir, ".nodin")
-			if _, err := os.Stat(nodinPath); os.IsNotExist(err) {
+			info, err := os.Stat(nodinPath)
+			if os.IsNotExist(err) {
 				return os.MkdirAll(nodinPath, 0700)
+			}
+			if err != nil {
+				return err
+			}
+			if perm := info.Mode().Perm(); perm&0077 != 0 {
+				return fmt.Errorf(".nodin/ is %04o; should be 0700 (snapshots readable by others)", perm)
 			}
 			return nil
 		})
