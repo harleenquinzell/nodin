@@ -38,6 +38,12 @@ func PagePath(p notion.Page, lookup func(id string) (notion.Page, bool)) (string
 		dbSlug := Slugify(db.Title()) + "-" + shortID(db.ID)
 		return filepath.Join("databases", dbSlug, slug+".md"), nil
 
+	case "block_id":
+		// Page is embedded inside a block (e.g. inside a toggle or callout).
+		// Traversing block→page requires an extra API call we don't have here,
+		// so fall back to _orphans/ rather than failing the whole pull.
+		return filepath.Join("_orphans", slug, slug+".md"), nil
+
 	default:
 		return "", fmt.Errorf("unknown parent type %q", p.Parent.Type)
 	}
