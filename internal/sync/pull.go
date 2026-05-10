@@ -142,6 +142,11 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		DownloadAssets: cfg.DownloadAssets,
 	}
 
+	idx, err := store.ReadIndex()
+	if err != nil {
+		return nil, fmt.Errorf("read index: %w", err)
+	}
+
 	report := &PullReport{}
 
 	total := len(pages)
@@ -159,7 +164,7 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 	for _, page := range pages {
 		page := page // capture
 		g.Go(func() error {
-			if err := pullPage(ctx, cfg, store, client, page, lookup, opts, report, notifyProgress); err != nil {
+			if err := pullPage(ctx, cfg, store, client, page, lookup, idx, opts, report, notifyProgress); err != nil {
 				return fmt.Errorf("pull page %s: %w", page.ID, err)
 			}
 			return nil
@@ -199,6 +204,7 @@ func pullPage(
 	client *notion.Client,
 	page notion.Page,
 	lookup func(string) (notion.Page, bool),
+	idx map[string]state.IndexEntry,
 	opts convert.PullOptions,
 	report *PullReport,
 	notify func(localPath string),
@@ -217,10 +223,8 @@ func pullPage(
 	// user-chosen filename) keep that filename across pulls instead of getting
 	// duplicated under their canonical slug.
 	var localPath string
-	if existing, err := store.ReadIndex(); err == nil {
-		if e, ok := existing[page.ID]; ok && e.LocalPath != "" && e.Type == "page" {
-			localPath = e.LocalPath
-		}
+	if e, ok := idx[page.ID]; ok && e.LocalPath != "" && e.Type == "page" {
+		localPath = e.LocalPath
 	}
 	if localPath == "" {
 		localPath, err = pathmap.PagePath(page, lookup)
