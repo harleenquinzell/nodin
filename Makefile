@@ -16,7 +16,13 @@ test-integration:
 		go test -tags integration -timeout 300s -v ./internal/sync/ ./internal/notion/'
 
 lint:
-	cd $(ROOT) && go vet ./...
+	@cd $(ROOT) && unformatted=$$(gofmt -l .); \
+		if [ -n "$$unformatted" ]; then \
+			echo "Files not formatted (run gofmt -w .):"; \
+			echo "$$unformatted"; \
+			exit 1; \
+		fi
+	cd $(ROOT) && golangci-lint run ./...
 
 clean:
 	rm -f $(BIN)
@@ -28,6 +34,6 @@ help:
 	@echo "build            build the nodin binary"
 	@echo "test             run unit tests (no network required)"
 	@echo "test-integration run integration tests (sources .env for credentials)"
-	@echo "lint             run go vet"
+	@echo "lint             run gofmt check + golangci-lint"
 	@echo "install          go install ./cmd/nodin"
 	@echo "clean            remove the built binary"
