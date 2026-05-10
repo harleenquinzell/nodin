@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	defaultBaseURL    = "https://api.notion.com/v1"
-	notionVersion     = "2022-06-28"
-	maxRetries        = 5
-	requestTimeout    = 30 * time.Second
+	defaultBaseURL = "https://api.notion.com/v1"
+	notionVersion  = "2022-06-28"
+	maxRetries     = 5
+	requestTimeout = 30 * time.Second
 )
 
 var tokenRe = regexp.MustCompile(`(secret_|ntn_)[A-Za-z0-9]+`)

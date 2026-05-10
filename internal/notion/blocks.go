@@ -381,7 +381,9 @@ func NewEquationRichText(expr string) RichText {
 	return RichText{
 		Type:      "equation",
 		PlainText: expr,
-		Equation:  &struct{ Expression string `json:"expression"` }{Expression: expr},
+		Equation: &struct {
+			Expression string `json:"expression"`
+		}{Expression: expr},
 	}
 }
 

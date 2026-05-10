@@ -35,7 +35,7 @@ func TestSlugify(t *testing.T) {
 	}{
 		{"Hello World", "hello-world"},
 		{"  Leading/Trailing  ", "leading-trailing"},
-		{"café", "caf"},           // 'é' isn't in [a-z0-9]; replaced by '-' then trimmed
+		{"café", "caf"}, // 'é' isn't in [a-z0-9]; replaced by '-' then trimmed
 		{"", "untitled"},
 		{"123", "123"},
 		{"Hello---World", "hello-world"},

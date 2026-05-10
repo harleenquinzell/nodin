@@ -99,8 +99,10 @@ type RichText struct {
 	Href        *string     `json:"href"`
 	Annotations Annotations `json:"annotations"`
 	Text        *struct {
-		Content string  `json:"content"`
-		Link    *struct{ URL string `json:"url"` } `json:"link"`
+		Content string `json:"content"`
+		Link    *struct {
+			URL string `json:"url"`
+		} `json:"link"`
 	} `json:"text,omitempty"`
 	Mention  *json.RawMessage `json:"mention,omitempty"`
 	Equation *struct {

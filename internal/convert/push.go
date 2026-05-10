@@ -449,7 +449,7 @@ func (p *lineParser) parseImage(indent int) (notion.Block, error) {
 	return notion.Block{
 		Type: "image",
 		Content: &notion.ImageContent{
-			Type:    "external",
+			Type: "external",
 			External: &struct {
 				URL string `json:"url"`
 			}{URL: url},

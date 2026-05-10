@@ -85,7 +85,6 @@ func Slugify(title string) string {
 	return result
 }
 
-
 // shortID returns the first 8 hex characters of a Notion UUID (without hyphens).
 func shortID(id string) string {
 	clean := strings.ReplaceAll(id, "-", "")

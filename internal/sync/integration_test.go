@@ -874,4 +874,3 @@ func TestIntegration_PushCreate_PreservesPath(t *testing.T) {
 		t.Errorf("duplicate canonical-path file written at %s; pull should respect existing index", canonicalPath)
 	}
 }
-

@@ -10,7 +10,7 @@ import (
 )
 
 func pf(f float64) *float64 { return &f }
-func pb(b bool) *bool        { return &b }
+func pb(b bool) *bool       { return &b }
 
 // roundTripProperty marshals pv to YAML and parses it back via YAMLToProperties.
 // The property type is preserved as a schema hint so parsing is unambiguous.

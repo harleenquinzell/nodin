@@ -338,7 +338,7 @@ func (d *Database) AsPage() Page {
 	titleRaw, _ := json.Marshal(map[string]any{
 		"type": "title",
 		"title": []map[string]any{{
-			"type":      "text",
+			"type":       "text",
 			"plain_text": d.TitleText(),
 			"text":       map[string]any{"content": d.TitleText(), "link": nil},
 			"annotations": map[string]bool{
