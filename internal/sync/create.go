@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -140,17 +139,15 @@ func resolveNewPageParent(syncDir, localPath string, idx map[string]state.IndexE
 	return newPageParent{}, fmt.Errorf("unsupported path %s: place new pages under pages/<slug>/<slug>.md or databases/<db>/<entry>.md", rel)
 }
 
-// readDatabaseSchema reads property name → type from _schema.json.
+// readDatabaseSchema reads _schema.json and returns the thin "name → type"
+// view used by entry-push codepaths. It accepts both the rich and legacy
+// thin on-disk formats.
 func readDatabaseSchema(path string) (map[string]string, error) {
-	data, err := os.ReadFile(path)
+	schema, err := ReadDatabaseSchema(path)
 	if err != nil {
 		return nil, err
 	}
-	var schema map[string]string
-	if err := json.Unmarshal(data, &schema); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return schema, nil
+	return schema.Thin(), nil
 }
 
 // inferTitle extracts a title for a brand-new page. Order of preference:

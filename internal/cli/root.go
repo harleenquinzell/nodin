@@ -37,6 +37,7 @@ func NewRootCmd(version string) *cobra.Command {
 		newPushCmd(),
 		newStatusCmd(),
 		newDiffCmd(),
+		newNewDBCmd(),
 	)
 
 	return root

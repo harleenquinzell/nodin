@@ -874,3 +874,82 @@ func TestIntegration_PushCreate_PreservesPath(t *testing.T) {
 		t.Errorf("duplicate canonical-path file written at %s; pull should respect existing index", canonicalPath)
 	}
 }
+
+// TestIntegration_CreateDatabase exercises the new-db core path against the
+// real Notion API: builds a rich schema, calls sync.CreateDatabase, then
+// verifies the DB exists on Notion with the expected title + properties, that
+// _schema.json round-trips, and that the index has a database-typed entry.
+func TestIntegration_CreateDatabase(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	title := "nodin-test-db-" + randSuffix()
+	schema := internalsync.DatabaseSchema{
+		Title: title,
+		Properties: map[string]internalsync.PropertySpec{
+			"Name":  {Type: "title"},
+			"Notes": {Type: "rich_text"},
+			"Status": {
+				Type: "select",
+				Options: []internalsync.SelectOption{
+					{Name: "Todo", Color: "gray"},
+					{Name: "Done", Color: "green"},
+				},
+			},
+		},
+	}
+
+	db, err := internalsync.CreateDatabase(ctx, cfg, store, client, schema, "")
+	if err != nil {
+		t.Fatalf("CreateDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = client.ArchiveDatabase(context.Background(), db.ID) })
+
+	if db.TitleText() != title {
+		t.Errorf("notion title = %q, want %q", db.TitleText(), title)
+	}
+
+	// Fetch the DB back from Notion and verify its property schema.
+	fetched, err := client.GetDatabase(ctx, db.ID)
+	if err != nil {
+		t.Fatalf("GetDatabase: %v", err)
+	}
+	thinFromNotion := fetched.Schema() // omits "title"
+	if thinFromNotion["Notes"] != "rich_text" {
+		t.Errorf("Notion-side Notes type = %q, want rich_text", thinFromNotion["Notes"])
+	}
+	if thinFromNotion["Status"] != "select" {
+		t.Errorf("Notion-side Status type = %q, want select", thinFromNotion["Status"])
+	}
+
+	// Index has the database entry at the canonical path.
+	idx, err := store.ReadIndex()
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	entry, ok := idx[db.ID]
+	if !ok {
+		t.Fatalf("index missing entry for new database %s", db.ID)
+	}
+	if entry.Type != "database" {
+		t.Errorf("entry.Type = %q, want database", entry.Type)
+	}
+
+	// _schema.json on disk round-trips the rich form.
+	schemaPath := filepath.Join(cfg.SyncDir, entry.LocalPath, "_schema.json")
+	onDisk, err := internalsync.ReadDatabaseSchema(schemaPath)
+	if err != nil {
+		t.Fatalf("ReadDatabaseSchema(%s): %v", schemaPath, err)
+	}
+	if onDisk.Title != title {
+		t.Errorf("on-disk title = %q, want %q", onDisk.Title, title)
+	}
+	if got := onDisk.Properties["Status"]; len(got.Options) != 2 {
+		t.Errorf("on-disk Status options = %+v, want 2 options", got.Options)
+	}
+}

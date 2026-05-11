@@ -519,3 +519,94 @@ func TestE2E_PushCreatesNewPage(t *testing.T) {
 		t.Errorf("update line %q not found in Notion after second push", updateLine)
 	}
 }
+
+// TestE2E_NewDB exercises the full nodin new-db CLI flow:
+// init → pipe interactive answers to new-db → verify the database exists on
+// Notion (via API) and the local _schema.json + index entry were written.
+func TestE2E_NewDB(t *testing.T) {
+	token, rootPageID := e2eCredentials(t)
+	dir := t.TempDir()
+	client := notion.NewClient(token, 3)
+
+	initWorkspace(t, dir, token, rootPageID)
+
+	title := fmt.Sprintf("nodin-e2e-db-%d", rand.Int63n(1_000_000_000))
+
+	// Interactive answers, in the same order the prompts appear:
+	//   Database title
+	//   Parent (empty → defaults to RootPageID from config)
+	//   Property 1: Name / title
+	//   Property 2: Status / select / option Todo / color gray / option Done / color green / empty (finish options)
+	//   Property 3: empty name (finish properties)
+	stdin := strings.Join([]string{
+		title,
+		"",
+		"Name",
+		"title",
+		"Status",
+		"select",
+		"Todo", "gray",
+		"Done", "green",
+		"",
+		"",
+	}, "\n") + "\n"
+
+	cmd := exec.Command(nodinBin, "new-db")
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(stdin)
+	combinedOut, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("new-db failed: %v\noutput:\n%s", err, combinedOut)
+	}
+	out := string(combinedOut)
+	if !strings.Contains(out, "created database") {
+		t.Errorf("new-db output missing 'created database':\n%s", out)
+	}
+
+	// Locate the new database in the index so we can clean it up and verify
+	// it on the Notion side.
+	type indexEntry struct {
+		NotionID  string `json:"notion_id"`
+		LocalPath string `json:"local_path"`
+		Type      string `json:"type"`
+	}
+	var idx map[string]indexEntry
+	idxData, err := os.ReadFile(filepath.Join(dir, ".nodin", "index.json"))
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	if err := json.Unmarshal(idxData, &idx); err != nil {
+		t.Fatalf("unmarshal index: %v", err)
+	}
+	var dbID, dbLocalPath string
+	for id, e := range idx {
+		if e.Type == "database" {
+			dbID = id
+			dbLocalPath = e.LocalPath
+			break
+		}
+	}
+	if dbID == "" {
+		t.Fatalf("no database entry in index; index:\n%s", idxData)
+	}
+	t.Cleanup(func() { _ = client.ArchiveDatabase(context.Background(), dbID) })
+
+	// _schema.json was written under the canonical databases/<slug>-<shortID>/ path.
+	schemaPath := filepath.Join(dir, dbLocalPath, "_schema.json")
+	if _, err := os.Stat(schemaPath); err != nil {
+		t.Errorf("_schema.json missing at %s: %v", schemaPath, err)
+	}
+
+	// Notion-side verification: title and property types match.
+	db, err := client.GetDatabase(context.Background(), dbID)
+	if err != nil {
+		t.Fatalf("GetDatabase: %v", err)
+	}
+	if db.TitleText() != title {
+		t.Errorf("notion title = %q, want %q", db.TitleText(), title)
+	}
+	schemaFromNotion := db.Schema() // omits "title"
+	if schemaFromNotion["Status"] != "select" {
+		t.Errorf("Status type on Notion = %q, want select", schemaFromNotion["Status"])
+	}
+}
