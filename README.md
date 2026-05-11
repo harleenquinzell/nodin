@@ -41,6 +41,7 @@ cd ~/my-notion-workspace
 nodin init      # prompts for token and root page, writes .nodin.toml here
 nodin doctor    # checks your config and connectivity
 nodin pull      # sync Notion → local
+nodin --help # Shows all available commands and documantation for it.
 ```
 
 nodin looks for `.nodin.toml` starting in the current directory and walking up, so you can have multiple independent workspaces:
@@ -51,20 +52,6 @@ nodin looks for `.nodin.toml` starting in the current directory and walking up, 
 ```
 
 You can also set `NODIN_TOKEN` and `NODIN_ROOT_PAGE_ID` as env vars, or use `--config` to point at a specific file.
-
-## Commands
-
-```sh
-nodin pull                       # fetch changes from Notion
-nodin push                       # push local changes to Notion
-nodin pull --page <id>           # pull a single page
-nodin push --page <id>           # push a single page
-nodin push --dry-run             # see what would be pushed without doing it
-nodin pull --since 2024-01-15T00:00:00Z   # override the incremental cursor
-nodin status                     # show which files have local changes
-nodin diff <file>                # diff a file against its last snapshot
-nodin doctor                     # health check
-```
 
 ## Config file
 
