@@ -133,7 +133,7 @@ func TestCreateDatabase_WritesSchemaAndIndex(t *testing.T) {
 		},
 	}
 
-	db, err := CreateDatabase(context.Background(), cfg, store, client, schema, "")
+	db, err := CreateDatabase(context.Background(), cfg, store, client, schema, CreateDatabaseOptions{})
 	if err != nil {
 		t.Fatalf("CreateDatabase: %v", err)
 	}
@@ -204,12 +204,71 @@ func TestCreateDatabase_NoParent(t *testing.T) {
 		},
 	}
 
-	_, err := CreateDatabase(context.Background(), cfg, store, client, schema, "")
+	_, err := CreateDatabase(context.Background(), cfg, store, client, schema, CreateDatabaseOptions{})
 	if err == nil {
 		t.Fatal("expected error when no parent is configured")
 	}
 	if !strings.Contains(err.Error(), "no parent page") {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestFindUntrackedDatabases(t *testing.T) {
+	tmp := t.TempDir()
+	// Pre-existing DB (tracked) at databases/known/.
+	if err := os.MkdirAll(filepath.Join(tmp, "databases", "known"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "databases", "known", "_schema.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Untracked DB at databases/newone/ with a schema file.
+	if err := os.MkdirAll(filepath.Join(tmp, "databases", "newone"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "databases", "newone", "_schema.json"), []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Directory under databases/ with no schema — should be ignored.
+	if err := os.MkdirAll(filepath.Join(tmp, "databases", "no-schema"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Hidden dir — should be ignored.
+	if err := os.MkdirAll(filepath.Join(tmp, "databases", ".cache"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := map[string]state.IndexEntry{
+		"db1": {NotionID: "db1", LocalPath: "databases/known", Type: "database"},
+	}
+	got, err := findUntrackedDatabases(tmp, idx)
+	if err != nil {
+		t.Fatalf("findUntrackedDatabases: %v", err)
+	}
+	if len(got) != 1 || got[0] != "databases/newone" {
+		t.Errorf("got %+v, want [databases/newone]", got)
+	}
+}
+
+func TestFindUntrackedDatabases_NoDir(t *testing.T) {
+	tmp := t.TempDir()
+	got, err := findUntrackedDatabases(tmp, nil)
+	if err != nil {
+		t.Fatalf("findUntrackedDatabases: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty result when databases/ is absent, got %+v", got)
+	}
+}
+
+func TestPushReport_SummaryIncludesDatabases(t *testing.T) {
+	r := &PushReport{Created: 2, DatabasesCreated: 1}
+	if !strings.Contains(r.Summary(), "1 databases created") {
+		t.Errorf("Summary = %q; missing DB count", r.Summary())
+	}
+	r2 := &PushReport{Created: 2}
+	if strings.Contains(r2.Summary(), "databases") {
+		t.Errorf("Summary should omit DB clause when none created: %q", r2.Summary())
 	}
 }
 
@@ -229,7 +288,7 @@ func TestCreateDatabase_InvalidSchema(t *testing.T) {
 			"Notes": {Type: "rich_text"},
 		},
 	}
-	_, err := CreateDatabase(context.Background(), cfg, store, client, schema, "")
+	_, err := CreateDatabase(context.Background(), cfg, store, client, schema, CreateDatabaseOptions{})
 	if err == nil {
 		t.Fatal("expected error for schema missing title property")
 	}

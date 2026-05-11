@@ -55,7 +55,8 @@ func runNewDB(cmd *cobra.Command, _ []string) error {
 	}
 
 	client := notion.NewClient(token, cfg.RPS)
-	db, err := internalsync.CreateDatabase(cmd.Context(), cfg, store, client, schema, parentPageID)
+	db, err := internalsync.CreateDatabase(cmd.Context(), cfg, store, client, schema,
+		internalsync.CreateDatabaseOptions{ParentPageID: parentPageID})
 	if err != nil {
 		return err
 	}

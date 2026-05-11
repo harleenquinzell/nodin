@@ -114,12 +114,25 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 	// Write _schema.json for each database directory and record the database in
 	// the index. The index entry lets push resolve the database ID when creating
 	// new entries in that directory.
+	//
+	// We read the index before the loop so that previously-recorded LocalPath
+	// values are preserved — both for DBs the user created locally (via push or
+	// new-db) and for DBs that were pulled to a now-renamed path. Without this
+	// check, every pull would re-derive the canonical "<slug>-<shortID>" path
+	// and silently duplicate user-chosen directories.
+	existingIdx, err := store.ReadIndex()
+	if err != nil {
+		return nil, fmt.Errorf("read index: %w", err)
+	}
 	for dbID, schema := range schemas {
 		dbPage, ok := pageMap[dbID]
 		if !ok {
 			continue
 		}
 		dbDirRel := pathmap.DatabasePath(dbPage)
+		if e, ok := existingIdx[dbID]; ok && e.LocalPath != "" {
+			dbDirRel = e.LocalPath
+		}
 		dbDir := filepath.Join(cfg.SyncDir, dbDirRel)
 		if err := os.MkdirAll(dbDir, 0755); err != nil {
 			continue

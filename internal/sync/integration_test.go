@@ -904,7 +904,7 @@ func TestIntegration_CreateDatabase(t *testing.T) {
 		},
 	}
 
-	db, err := internalsync.CreateDatabase(ctx, cfg, store, client, schema, "")
+	db, err := internalsync.CreateDatabase(ctx, cfg, store, client, schema, internalsync.CreateDatabaseOptions{})
 	if err != nil {
 		t.Fatalf("CreateDatabase: %v", err)
 	}
@@ -951,5 +951,136 @@ func TestIntegration_CreateDatabase(t *testing.T) {
 	}
 	if got := onDisk.Properties["Status"]; len(got.Options) != 2 {
 		t.Errorf("on-disk Status options = %+v, want 2 options", got.Options)
+	}
+}
+
+// TestIntegration_Pull_PreservesDBPath verifies that pull respects an existing
+// DB index entry: if a DB is registered at a non-canonical local path,
+// re-pulling does NOT move it to the canonical "<slug>-<shortID>/" path.
+func TestIntegration_Pull_PreservesDBPath(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	// Create a fresh DB on Notion via CreateDatabase at a chosen path.
+	customPath := "databases/nodin-test-pin-" + randSuffix()
+	title := "nodin-test-pin-" + randSuffix()
+	schema := internalsync.DatabaseSchema{
+		Title: title,
+		Properties: map[string]internalsync.PropertySpec{
+			"Name": {Type: "title"},
+		},
+	}
+	db, err := internalsync.CreateDatabase(ctx, cfg, store, client, schema, internalsync.CreateDatabaseOptions{
+		LocalPath: customPath,
+	})
+	if err != nil {
+		t.Fatalf("CreateDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = client.ArchiveDatabase(context.Background(), db.ID) })
+
+	// Confirm the file landed at the custom path before pulling.
+	if _, err := os.Stat(filepath.Join(cfg.SyncDir, customPath, "_schema.json")); err != nil {
+		t.Fatalf("schema not at custom path before pull: %v", err)
+	}
+
+	// Create an entry inside the DB so pull surfaces this DB (pull only fetches
+	// DBs whose pages it sees).
+	titleProp := "Name"
+	if _, err := client.CreatePageInDatabase(ctx, db.ID, titleProp, "row-"+randSuffix(), nil); err != nil {
+		t.Fatalf("CreatePageInDatabase: %v", err)
+	}
+
+	// Pull and verify the DB stayed at the custom path.
+	if _, err := internalsync.Pull(ctx, cfg, store, client, internalsync.PullOptions{}); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(cfg.SyncDir, customPath, "_schema.json")); err != nil {
+		t.Errorf("custom-path _schema.json missing after pull: %v", err)
+	}
+
+	// And no duplicate at the canonical path should exist.
+	canonical := filepath.Join("databases", strings.ToLower(strings.ReplaceAll(title, "-", "-"))+"-"+db.ID[:8])
+	if _, err := os.Stat(filepath.Join(cfg.SyncDir, canonical, "_schema.json")); err == nil {
+		t.Errorf("duplicate canonical-path DB written at %s; pull should respect existing index", canonical)
+	}
+
+	// Index still points at the custom path.
+	idx, _ := store.ReadIndex()
+	if e, ok := idx[db.ID]; !ok || filepath.ToSlash(e.LocalPath) != customPath {
+		t.Errorf("index LocalPath = %q, want %q", e.LocalPath, customPath)
+	}
+}
+
+// TestIntegration_Push_CreateDatabase exercises the new pushNewDatabases flow:
+// drop an untracked databases/<slug>/_schema.json under sync dir, run Push,
+// and verify the DB was created on Notion, the index has it at the user's path,
+// and the report counts it.
+func TestIntegration_Push_CreateDatabase(t *testing.T) {
+	client, cfg := integrationSetup(t)
+	ctx := context.Background()
+
+	store := state.Open(cfg.SyncDir)
+	if err := store.Init(); err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+
+	slug := "nodin-test-pushdb-" + randSuffix()
+	title := slug // schema title doubles as the Notion DB title
+	dbDir := filepath.Join(cfg.SyncDir, "databases", slug)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	schema := internalsync.DatabaseSchema{
+		Title: title,
+		Properties: map[string]internalsync.PropertySpec{
+			"Name":  {Type: "title"},
+			"Notes": {Type: "rich_text"},
+		},
+	}
+	if err := internalsync.WriteDatabaseSchema(filepath.Join(dbDir, "_schema.json"), schema); err != nil {
+		t.Fatalf("WriteDatabaseSchema: %v", err)
+	}
+
+	report, err := internalsync.Push(ctx, cfg, store, client, internalsync.PushOptions{})
+	if err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+	if report.DatabasesCreated != 1 {
+		t.Errorf("DatabasesCreated = %d, want 1; report: %+v", report.DatabasesCreated, report)
+	}
+
+	// Locate the index entry and arrange cleanup.
+	idx, _ := store.ReadIndex()
+	relPath := "databases/" + slug
+	var dbID string
+	for id, e := range idx {
+		if e.Type == "database" && filepath.ToSlash(e.LocalPath) == relPath {
+			dbID = id
+			break
+		}
+	}
+	if dbID == "" {
+		t.Fatalf("no database index entry at %s", relPath)
+	}
+	t.Cleanup(func() { _ = client.ArchiveDatabase(context.Background(), dbID) })
+
+	// Notion-side verification.
+	got, err := client.GetDatabase(ctx, dbID)
+	if err != nil {
+		t.Fatalf("GetDatabase: %v", err)
+	}
+	if got.TitleText() != title {
+		t.Errorf("notion title = %q, want %q", got.TitleText(), title)
+	}
+	notionSchema := got.Schema()
+	if notionSchema["Notes"] != "rich_text" {
+		t.Errorf("Notes type on Notion = %q, want rich_text", notionSchema["Notes"])
 	}
 }

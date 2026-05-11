@@ -28,18 +28,24 @@ type PushOptions struct {
 
 // PushReport summarises the results of a push.
 type PushReport struct {
-	mu        sync.Mutex
-	Pushed    int
-	Created   int
-	Skipped   int
-	Conflicts int
-	Pages     []string
+	mu               sync.Mutex
+	Pushed           int
+	Created          int
+	DatabasesCreated int
+	Skipped          int
+	Conflicts        int
+	Pages            []string
+	Databases        []string
 }
 
 // Summary returns a one-line summary string.
 func (r *PushReport) Summary() string {
-	return fmt.Sprintf("%d pushed, %d created, %d skipped, %d conflicts",
+	s := fmt.Sprintf("%d pushed, %d created, %d skipped, %d conflicts",
 		r.Pushed, r.Created, r.Skipped, r.Conflicts)
+	if r.DatabasesCreated > 0 {
+		s += fmt.Sprintf(", %d databases created", r.DatabasesCreated)
+	}
+	return s
 }
 
 // Push reads locally modified pages and uploads the changes to Notion.
@@ -111,6 +117,15 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 
 	if err := g.Wait(); err != nil {
 		return report, err
+	}
+
+	// Create new databases first so that any untracked .md files inside them
+	// have a parent to attach to in the pushNewPages step below.
+	// Skipped when --page filters to a Notion ID (no DB creation from an ID).
+	if pushOpts.PageID == "" || strings.Contains(pushOpts.PageID, "/") {
+		if err := pushNewDatabases(parentCtx, cfg, store, client, report); err != nil {
+			return report, err
+		}
 	}
 
 	// Create new pages for any untracked .md files. Skipped when --page filters

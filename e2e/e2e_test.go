@@ -610,3 +610,74 @@ func TestE2E_NewDB(t *testing.T) {
 		t.Errorf("Status type on Notion = %q, want select", schemaFromNotion["Status"])
 	}
 }
+
+// TestE2E_PushCreatesDatabase exercises the auto-create-on-push flow: the user
+// drops a _schema.json under databases/<slug>/ and runs push. The DB must be
+// created on Notion, the local path preserved, and the push summary must say
+// "1 databases created".
+func TestE2E_PushCreatesDatabase(t *testing.T) {
+	token, rootPageID := e2eCredentials(t)
+	dir := t.TempDir()
+	client := notion.NewClient(token, 3)
+
+	initWorkspace(t, dir, token, rootPageID)
+
+	slug := fmt.Sprintf("nodin-e2e-pushdb-%d", rand.Int63n(1_000_000_000))
+	dbDir := filepath.Join(dir, "databases", slug)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	schemaJSON := fmt.Sprintf(`{
+		"title": %q,
+		"properties": {
+			"Name":  { "type": "title" },
+			"Notes": { "type": "rich_text" }
+		}
+	}`, slug)
+	if err := os.WriteFile(filepath.Join(dbDir, "_schema.json"), []byte(schemaJSON), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	out, code := runIn(t, dir, "push")
+	if code != 0 {
+		t.Fatalf("push exited %d\noutput:\n%s", code, out)
+	}
+	if !strings.Contains(out, "1 databases created") {
+		t.Errorf("push output missing '1 databases created':\n%s", out)
+	}
+
+	// Index has a database entry at the user-chosen path.
+	type indexEntry struct {
+		LocalPath string `json:"local_path"`
+		Type      string `json:"type"`
+	}
+	var idx map[string]indexEntry
+	idxData, err := os.ReadFile(filepath.Join(dir, ".nodin", "index.json"))
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	if err := json.Unmarshal(idxData, &idx); err != nil {
+		t.Fatalf("unmarshal index: %v", err)
+	}
+	relPath := "databases/" + slug
+	var dbID string
+	for id, e := range idx {
+		if e.Type == "database" && e.LocalPath == relPath {
+			dbID = id
+			break
+		}
+	}
+	if dbID == "" {
+		t.Fatalf("no database entry at %s; index:\n%s", relPath, idxData)
+	}
+	t.Cleanup(func() { _ = client.ArchiveDatabase(context.Background(), dbID) })
+
+	// Notion-side verification.
+	db, err := client.GetDatabase(context.Background(), dbID)
+	if err != nil {
+		t.Fatalf("GetDatabase: %v", err)
+	}
+	if db.TitleText() != slug {
+		t.Errorf("notion title = %q, want %q", db.TitleText(), slug)
+	}
+}
