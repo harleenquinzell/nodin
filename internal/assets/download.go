@@ -44,7 +44,7 @@ func Download(ctx context.Context, client *http.Client, url, fileID, syncDir str
 	if err != nil {
 		return "", fmt.Errorf("download asset: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("%w: HTTP %d for %s", ErrDownloadFailed, resp.StatusCode, url)
@@ -58,16 +58,16 @@ func Download(ctx context.Context, client *http.Client, url, fileID, syncDir str
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
-		os.Remove(tmp)
+		_ = f.Close()
+		_ = os.Remove(tmp)
 		return "", fmt.Errorf("write asset: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return "", fmt.Errorf("close asset file: %w", err)
 	}
 	if err := os.Rename(tmp, localPath); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return "", fmt.Errorf("rename asset: %w", err)
 	}
 

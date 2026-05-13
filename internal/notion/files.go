@@ -104,7 +104,7 @@ func sendMultipartChunk(ctx context.Context, url, filename string, r io.Reader) 
 	if _, err := io.Copy(fw, r); err != nil {
 		return "", err
 	}
-	mw.Close()
+	_ = mw.Close()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, &buf)
 	if err != nil {
@@ -116,7 +116,7 @@ func sendMultipartChunk(ctx context.Context, url, filename string, r io.Reader) 
 	if err != nil {
 		return "", err
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 	body, _ := io.ReadAll(httpResp.Body)
 
 	if httpResp.StatusCode >= 300 {

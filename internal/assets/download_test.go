@@ -14,7 +14,7 @@ import (
 func TestDownload_NewFile(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("image data"))
+		_, _ = w.Write([]byte("image data"))
 	}))
 	defer srv.Close()
 
@@ -42,7 +42,7 @@ func TestDownload_ExistingFileSkipped(t *testing.T) {
 	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
-		w.Write([]byte("image data"))
+		_, _ = w.Write([]byte("image data"))
 	}))
 	defer srv.Close()
 

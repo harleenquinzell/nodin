@@ -29,9 +29,9 @@ type SelectOption struct {
 }
 
 // SupportedPropertyTypes lists the property types nodin can create today.
-// Other types (relation, formula, rollup, status, files, people, …) are
-// deferred and rejected by ValidateSchema.
+// Deferred (require extra config or cross-DB references): formula, relation, rollup.
 var SupportedPropertyTypes = map[string]bool{
+	// editable
 	"title":        true,
 	"rich_text":    true,
 	"number":       true,
@@ -42,6 +42,15 @@ var SupportedPropertyTypes = map[string]bool{
 	"phone_number": true,
 	"select":       true,
 	"multi_select": true,
+	"status":       true,
+	"people":       true,
+	"files":        true,
+	// auto-populated by Notion (read-only values, but valid column types)
+	"created_time":     true,
+	"last_edited_time": true,
+	"created_by":       true,
+	"last_edited_by":   true,
+	"unique_id":        true,
 }
 
 // SupportedSelectColors lists the colors Notion accepts on a select option.

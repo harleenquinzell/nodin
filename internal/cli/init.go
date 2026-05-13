@@ -139,7 +139,7 @@ func ensureGitignore(syncDir string) error {
 	if err != nil {
 		return fmt.Errorf("write .gitignore: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Only append if the .nodin/ rule is not already present.
 	existing, _ := os.ReadFile(path)

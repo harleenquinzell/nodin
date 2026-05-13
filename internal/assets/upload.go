@@ -17,7 +17,7 @@ func Upload(ctx context.Context, client *notion.Client, localPath string) (strin
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", localPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	info, err := f.Stat()
 	if err != nil {

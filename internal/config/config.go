@@ -244,7 +244,7 @@ func Write(path string, c *Config) error {
 	if err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return toml.NewEncoder(f).Encode(raw)
 }
@@ -270,7 +270,7 @@ func isValidUUID(s string) bool {
 		return false
 	}
 	for _, ch := range s {
-		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') && (ch < 'A' || ch > 'F') {
 			return false
 		}
 	}

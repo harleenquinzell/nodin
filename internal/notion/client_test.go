@@ -51,7 +51,7 @@ func TestGetPage_Success(t *testing.T) {
 			t.Error("missing Authorization header")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, minimalPage)
+		_, _ = fmt.Fprint(w, minimalPage)
 	}))
 
 	page, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -69,7 +69,7 @@ func TestGetPage_Success(t *testing.T) {
 func TestGetPage_NotFound(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, `{"object":"error","status":404,"code":"object_not_found","message":"Could not find page"}`)
+		_, _ = fmt.Fprint(w, `{"object":"error","status":404,"code":"object_not_found","message":"Could not find page"}`)
 	}))
 
 	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -81,7 +81,7 @@ func TestGetPage_NotFound(t *testing.T) {
 func TestGetPage_Unauthorized(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"object":"error","status":401,"code":"unauthorized","message":"API token is invalid"}`)
+		_, _ = fmt.Fprint(w, `{"object":"error","status":401,"code":"unauthorized","message":"API token is invalid"}`)
 	}))
 
 	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -101,7 +101,7 @@ func TestRetry_429(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, minimalPage)
+		_, _ = fmt.Fprint(w, minimalPage)
 	}))
 
 	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -122,7 +122,7 @@ func TestRetry_5xx(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, minimalPage)
+		_, _ = fmt.Fprint(w, minimalPage)
 	}))
 
 	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -139,7 +139,7 @@ func TestNoRetry_4xx(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `{"object":"error","status":400,"code":"invalid_json","message":"bad request"}`)
+		_, _ = fmt.Fprint(w, `{"object":"error","status":400,"code":"invalid_json","message":"bad request"}`)
 	}))
 
 	_, err := client.GetPage(context.Background(), "3589c940-0284-81d3-b435-fcf079d89792")
@@ -156,7 +156,7 @@ func TestNotionVersionHeader(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotVersion = r.Header.Get("Notion-Version")
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"object":"list","results":[],"next_cursor":"","has_more":false}`)
+		_, _ = fmt.Fprint(w, `{"object":"list","results":[],"next_cursor":"","has_more":false}`)
 	}))
 
 	_, _ = client.Search(context.Background(), notion.SearchOpts{Limit: 1})
@@ -174,9 +174,9 @@ func TestSearch_Pagination(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		if callCount == 0 {
 			callCount++
-			fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"cursor1","has_more":true}`, minimalPage)
+			_, _ = fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"cursor1","has_more":true}`, minimalPage)
 		} else {
-			fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"","has_more":false}`, minimalPage)
+			_, _ = fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"","has_more":false}`, minimalPage)
 		}
 	}))
 
@@ -195,7 +195,7 @@ func TestIncrementalPages_EarlyExit(t *testing.T) {
 	// The client should stop after the first batch and return zero results.
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"","has_more":false}`, minimalPage)
+		_, _ = fmt.Fprintf(w, `{"object":"list","results":[%s],"next_cursor":"","has_more":false}`, minimalPage)
 	}))
 
 	future := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -230,7 +230,7 @@ func TestTokenRedacted(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Echo the Authorization header back in the error body so we can check redaction.
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"object":"error","status":400,"code":"test","message":"auth: %s"}`,
+		_, _ = fmt.Fprintf(w, `{"object":"error","status":400,"code":"test","message":"auth: %s"}`,
 			r.Header.Get("Authorization"))
 	})).WithToken(secretToken)
 

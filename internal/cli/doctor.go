@@ -126,8 +126,8 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return fmt.Errorf("not writable: %w", err)
 			}
-			tmp.Close()
-			os.Remove(tmp.Name())
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
 			return nil
 		})
 

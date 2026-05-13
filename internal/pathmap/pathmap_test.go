@@ -7,23 +7,6 @@ import (
 	"github.com/harleenquinzell/nodin/internal/pathmap"
 )
 
-func makePage(id, title, parentType, parentID string) notion.Page {
-	p := notion.Page{
-		ID:     id,
-		Parent: notion.Parent{Type: parentType},
-	}
-	if parentType == "page_id" {
-		p.Parent.PageID = parentID
-	} else if parentType == "database_id" {
-		p.Parent.DatabaseID = parentID
-	}
-	// Inject title via Properties map.
-	// We use a minimal JSON approach: the Page.Title() method scans Properties.
-	// For test simplicity, use a fake lookup that sets title from a map.
-	_ = title // handled via titleMap in test
-	return p
-}
-
 func noLookup(id string) (notion.Page, bool) {
 	return notion.Page{}, false
 }

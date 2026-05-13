@@ -21,19 +21,19 @@ func ThreeWay(base, local, remote string) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("write base temp: %w", err)
 	}
-	defer os.Remove(baseF)
+	defer func() { _ = os.Remove(baseF) }()
 
 	localF, err := writeTmp("nodin-local-*", local)
 	if err != nil {
 		return Result{}, fmt.Errorf("write local temp: %w", err)
 	}
-	defer os.Remove(localF)
+	defer func() { _ = os.Remove(localF) }()
 
 	remoteF, err := writeTmp("nodin-remote-*", remote)
 	if err != nil {
 		return Result{}, fmt.Errorf("write remote temp: %w", err)
 	}
-	defer os.Remove(remoteF)
+	defer func() { _ = os.Remove(remoteF) }()
 
 	// git merge-file -p --diff3 <local> <base> <remote>
 	// -p: output to stdout instead of modifying localF
@@ -63,11 +63,11 @@ func writeTmp(pattern, content string) (string, error) {
 	_, writeErr := f.WriteString(content)
 	closeErr := f.Close()
 	if writeErr != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", writeErr
 	}
 	if closeErr != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", closeErr
 	}
 	return f.Name(), nil

@@ -173,6 +173,39 @@ func TestValidateSchema(t *testing.T) {
 	}
 }
 
+func TestValidateSchema_NewSimpleTypes(t *testing.T) {
+	base := map[string]PropertySpec{"Name": {Type: "title"}}
+
+	// status does not require pre-defined options (Notion auto-generates them).
+	statusSchema := DatabaseSchema{
+		Title: "Tracker",
+		Properties: map[string]PropertySpec{
+			"Name":   {Type: "title"},
+			"State":  {Type: "status"},
+			"Owner":  {Type: "people"},
+			"Attach": {Type: "files"},
+		},
+	}
+	if err := ValidateSchema(statusSchema); err != nil {
+		t.Errorf("status/people/files schema rejected: %v", err)
+	}
+
+	autoTypes := []string{"created_time", "last_edited_time", "created_by", "last_edited_by", "unique_id"}
+	for _, typ := range autoTypes {
+		t.Run(typ, func(t *testing.T) {
+			props := map[string]PropertySpec{"Name": {Type: "title"}}
+			for name, spec := range base {
+				props[name] = spec
+			}
+			props["Auto"] = PropertySpec{Type: typ}
+			s := DatabaseSchema{Title: "T", Properties: props}
+			if err := ValidateSchema(s); err != nil {
+				t.Errorf("type %q rejected: %v", typ, err)
+			}
+		})
+	}
+}
+
 func TestWriteAndRead_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "_schema.json")

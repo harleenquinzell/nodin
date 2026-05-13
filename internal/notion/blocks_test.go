@@ -45,10 +45,10 @@ func TestGetBlocks_ClosedToggleForceFetch(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "page-001/children"):
-			fmt.Fprint(w, blockListResponse(toggleBlockClosed))
+			_, _ = fmt.Fprint(w, blockListResponse(toggleBlockClosed))
 		case strings.HasSuffix(r.URL.Path, "toggle-001/children"):
 			toggleChildrenFetched.Store(true)
-			fmt.Fprint(w, blockListResponse(paragraphChild))
+			_, _ = fmt.Fprint(w, blockListResponse(paragraphChild))
 		default:
 			http.NotFound(w, r)
 		}
@@ -92,10 +92,10 @@ func TestGetBlocks_ToggleableHeadingForceFetch(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "page-002/children"):
-			fmt.Fprint(w, blockListResponse(toggleableHeadingClosed))
+			_, _ = fmt.Fprint(w, blockListResponse(toggleableHeadingClosed))
 		case strings.HasSuffix(r.URL.Path, "heading-001/children"):
 			headingChildrenFetched.Store(true)
-			fmt.Fprint(w, blockListResponse(paragraphChild))
+			_, _ = fmt.Fprint(w, blockListResponse(paragraphChild))
 		default:
 			http.NotFound(w, r)
 		}
@@ -130,10 +130,10 @@ func TestGetBlocks_NonToggleSkipped(t *testing.T) {
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if strings.HasSuffix(r.URL.Path, "page-003/children") {
-			fmt.Fprint(w, blockListResponse(plainParagraph))
+			_, _ = fmt.Fprint(w, blockListResponse(plainParagraph))
 		} else {
 			extraCalls.Add(1)
-			fmt.Fprint(w, blockListResponse())
+			_, _ = fmt.Fprint(w, blockListResponse())
 		}
 	}))
 

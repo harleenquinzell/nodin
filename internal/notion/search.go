@@ -73,7 +73,6 @@ func (c *Client) Search(ctx context.Context, opts SearchOpts) (*SearchResponse, 
 // Results are sorted descending by last_edited_time; we stop as soon as we see
 // a page that is not newer than since.
 func (c *Client) IncrementalPages(ctx context.Context, since time.Time) ([]Page, error) {
-	zeroTime := time.Time{}
 	return walkCursor(ctx,
 		func(cursor string) ([]Page, string, bool, error) {
 			resp, err := c.Search(ctx, SearchOpts{
@@ -87,7 +86,7 @@ func (c *Client) IncrementalPages(ctx context.Context, since time.Time) ([]Page,
 			return resp.Results, resp.NextCursor, resp.HasMore, nil
 		},
 		func(p Page) bool {
-			if since == zeroTime {
+			if since.IsZero() {
 				return false
 			}
 			return !p.LastEditedTime.After(since)

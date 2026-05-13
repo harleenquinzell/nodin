@@ -130,7 +130,7 @@ func writeFile(path string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return fmt.Errorf("rename %s: %w", path, err)
 	}
 	return nil

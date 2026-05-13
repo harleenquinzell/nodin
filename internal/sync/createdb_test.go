@@ -51,6 +51,37 @@ func TestSchemaToAPIProperties(t *testing.T) {
 	}
 }
 
+func TestSchemaToAPIProperties_SimpleTypes(t *testing.T) {
+	// These types all map to {type: {}} — verify no panic and correct shape.
+	simple := []string{
+		"status", "people", "files",
+		"created_time", "last_edited_time",
+		"created_by", "last_edited_by",
+		"unique_id",
+	}
+	props := map[string]PropertySpec{"Name": {Type: "title"}}
+	for _, typ := range simple {
+		props[typ] = PropertySpec{Type: typ}
+	}
+	api := schemaToAPIProperties(DatabaseSchema{Title: "T", Properties: props})
+
+	for _, typ := range simple {
+		entry, ok := api[typ].(map[string]any)
+		if !ok {
+			t.Errorf("api[%q] not a map", typ)
+			continue
+		}
+		cfg, ok := entry[typ].(map[string]any)
+		if !ok {
+			t.Errorf("api[%q][%q] not a map: %+v", typ, typ, entry)
+			continue
+		}
+		if len(cfg) != 0 {
+			t.Errorf("api[%q][%q] config should be empty {}, got %+v", typ, typ, cfg)
+		}
+	}
+}
+
 // fakeNotionDatabaseServer is a one-endpoint stand-in for the Notion API that
 // captures the create-database POST body and returns a canned database object.
 func fakeNotionDatabaseServer(t *testing.T, dbID string, capture *map[string]any) *httptest.Server {

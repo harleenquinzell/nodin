@@ -189,7 +189,7 @@ func unifiedDiff(want, got string) string {
 			g = gotLines[i]
 		}
 		if w != g {
-			sb.WriteString(fmt.Sprintf("line %d:\n  want: %q\n   got: %q\n", i+1, w, g))
+			fmt.Fprintf(&sb, "line %d:\n  want: %q\n   got: %q\n", i+1, w, g)
 		}
 	}
 	return sb.String()
