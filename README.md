@@ -17,14 +17,7 @@ I tried other notion sync tools out there, but none that fit my ways of working,
 go install github.com/harleenquinzell/nodin/cmd/nodin@latest
 ```
 
-Then make sure Go's bin directory is on your path (add this to your `~/.bashrc` or `~/.zshrc`):
-
-```sh
-export PATH="$PATH:$HOME/go/bin"
-# or whatever your go path is. if unsure, run `which go`, it should tell you.
-```
-
-Or from source:
+Make sure `$(go env GOPATH)/bin` is on your `PATH`. Or build from source:
 
 ```sh
 git clone https://github.com/harleenquinzell/nodin
@@ -41,7 +34,6 @@ cd ~/my-notion-workspace
 nodin init      # prompts for token and root page, writes .nodin.toml here
 nodin doctor    # checks your config and connectivity
 nodin pull      # sync Notion → local
-nodin --help # Shows all available commands and documantation for it.
 ```
 
 nodin looks for `.nodin.toml` starting in the current directory and walking up, so you can have multiple independent workspaces:
@@ -53,33 +45,13 @@ nodin looks for `.nodin.toml` starting in the current directory and walking up, 
 
 You can also set `NODIN_TOKEN` and `NODIN_ROOT_PAGE_ID` as env vars, or use `--config` to point at a specific file.
 
-## Config file
+## Config
 
-`~/.config/nodin/config.toml`:
-
-```toml
-[auth]
-token = "secret_..."        # or use token_file = "~/.secrets/notion-token"
-
-[sync]
-root_page_id    = "3589c940-..."
-sync_dir        = "~/notion"
-rate_limit_rps  = 3          # Notion's API cap
-concurrency     = 4
-auto_commit     = true       # git commit before/after each sync
-download_assets = true       # download images and files locally
-```
+`nodin init` writes a `.nodin.toml` with sensible defaults; edit it to taste and run `nodin doctor` to validate. A user-wide config can also live at `~/.config/nodin/config.toml`. The token can be inlined as `token = "..."` or pointed at a file with `token_file = "~/.secrets/notion-token"`.
 
 ## Development
 
-```sh
-make build           # build the binary
-make test            # unit tests, no network needed
-make test-integration  # integration tests — reads credentials from .env
-make help            # list all targets
-```
-
-The Makefile works from any directory. For integration tests, copy `.env.example` to `.env` and fill in your values first.
+`make help` lists the targets. Integration tests need `.env` (copy from `.env.example`).
 
 If you want to contribute but don't know with what, I keep a list of improvements I want to make in the Issues, check it out!
 
