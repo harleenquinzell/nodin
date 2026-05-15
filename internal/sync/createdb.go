@@ -204,6 +204,10 @@ func schemaToAPIProperties(s DatabaseSchema) map[string]any {
 			config["options"] = opts
 		case "number":
 			config["format"] = "number"
+		case "formula":
+			config["expression"] = spec.Expression
+		case "relation":
+			config["database_id"] = spec.RelationDatabaseID
 		}
 		props[name] = map[string]any{spec.Type: config}
 	}

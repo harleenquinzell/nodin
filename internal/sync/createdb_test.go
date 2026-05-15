@@ -51,6 +51,30 @@ func TestSchemaToAPIProperties(t *testing.T) {
 	}
 }
 
+func TestSchemaToAPIProperties_FormulaAndRelation(t *testing.T) {
+	s := DatabaseSchema{
+		Title: "T",
+		Properties: map[string]PropertySpec{
+			"Name":    {Type: "title"},
+			"Calc":    {Type: "formula", Expression: `prop("Name")`},
+			"Related": {Type: "relation", RelationDatabaseID: "aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb"},
+		},
+	}
+	api := schemaToAPIProperties(s)
+
+	calcEntry := api["Calc"].(map[string]any)
+	calcCfg := calcEntry["formula"].(map[string]any)
+	if calcCfg["expression"] != `prop("Name")` {
+		t.Errorf("formula expression = %v", calcCfg["expression"])
+	}
+
+	relEntry := api["Related"].(map[string]any)
+	relCfg := relEntry["relation"].(map[string]any)
+	if relCfg["database_id"] != "aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb" {
+		t.Errorf("relation database_id = %v", relCfg["database_id"])
+	}
+}
+
 func TestSchemaToAPIProperties_SimpleTypes(t *testing.T) {
 	// These types all map to {type: {}} — verify no panic and correct shape.
 	simple := []string{

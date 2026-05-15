@@ -20,6 +20,10 @@ type DatabaseSchema struct {
 type PropertySpec struct {
 	Type    string         `json:"type"`
 	Options []SelectOption `json:"options,omitempty"`
+	// formula only: the Notion formula expression, e.g. prop("Name")
+	Expression string `json:"expression,omitempty"`
+	// relation only: UUID of the target database
+	RelationDatabaseID string `json:"relation_database_id,omitempty"`
 }
 
 // SelectOption is one choice in a select / multi_select property.
@@ -29,7 +33,7 @@ type SelectOption struct {
 }
 
 // SupportedPropertyTypes lists the property types nodin can create today.
-// Deferred (require extra config or cross-DB references): formula, relation, rollup.
+// Deferred (requires three extra config fields and a pre-existing relation): rollup.
 var SupportedPropertyTypes = map[string]bool{
 	// editable
 	"title":        true,
@@ -45,6 +49,8 @@ var SupportedPropertyTypes = map[string]bool{
 	"status":       true,
 	"people":       true,
 	"files":        true,
+	"formula":      true,
+	"relation":     true,
 	// auto-populated by Notion (read-only values, but valid column types)
 	"created_time":     true,
 	"last_edited_time": true,
@@ -145,10 +151,12 @@ func ValidateSchema(s DatabaseSchema) error {
 	}
 
 	var (
-		titleProps   []string
-		unsupported  []string
-		emptySelects []string
-		badColors    []string
+		titleProps      []string
+		unsupported     []string
+		emptySelects    []string
+		badColors       []string
+		missingExpr     []string
+		missingRelation []string
 	)
 	for name, spec := range s.Properties {
 		if spec.Type == "title" {
@@ -158,7 +166,8 @@ func ValidateSchema(s DatabaseSchema) error {
 			unsupported = append(unsupported, fmt.Sprintf("%s (%s)", name, spec.Type))
 			continue
 		}
-		if spec.Type == "select" || spec.Type == "multi_select" {
+		switch spec.Type {
+		case "select", "multi_select":
 			if len(spec.Options) == 0 {
 				emptySelects = append(emptySelects, name)
 				continue
@@ -167,6 +176,14 @@ func ValidateSchema(s DatabaseSchema) error {
 				if !SupportedSelectColors[opt.Color] {
 					badColors = append(badColors, fmt.Sprintf("%s.%s=%s", name, opt.Name, opt.Color))
 				}
+			}
+		case "formula":
+			if strings.TrimSpace(spec.Expression) == "" {
+				missingExpr = append(missingExpr, name)
+			}
+		case "relation":
+			if strings.TrimSpace(spec.RelationDatabaseID) == "" {
+				missingRelation = append(missingRelation, name)
 			}
 		}
 	}
@@ -193,6 +210,14 @@ func ValidateSchema(s DatabaseSchema) error {
 	if len(badColors) > 0 {
 		sort.Strings(badColors)
 		return fmt.Errorf("invalid select option colors: %s", strings.Join(badColors, ", "))
+	}
+	if len(missingExpr) > 0 {
+		sort.Strings(missingExpr)
+		return fmt.Errorf("formula properties missing expression: %s", strings.Join(missingExpr, ", "))
+	}
+	if len(missingRelation) > 0 {
+		sort.Strings(missingRelation)
+		return fmt.Errorf("relation properties missing relation_database_id: %s", strings.Join(missingRelation, ", "))
 	}
 	return nil
 }

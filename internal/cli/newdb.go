@@ -124,8 +124,19 @@ func promptForSchema(r *bufio.Reader, cfg *config.Config) (internalsync.Database
 		}
 
 		spec := internalsync.PropertySpec{Type: typ}
-		if typ == "select" || typ == "multi_select" {
+		switch typ {
+		case "select", "multi_select":
 			spec.Options, err = promptSelectOptions(r)
+			if err != nil {
+				return internalsync.DatabaseSchema{}, "", err
+			}
+		case "formula":
+			spec.Expression, err = promptRequired(r, "  Formula expression: ")
+			if err != nil {
+				return internalsync.DatabaseSchema{}, "", err
+			}
+		case "relation":
+			spec.RelationDatabaseID, err = promptRequired(r, "  Target database ID: ")
 			if err != nil {
 				return internalsync.DatabaseSchema{}, "", err
 			}

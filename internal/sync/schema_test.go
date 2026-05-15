@@ -125,8 +125,8 @@ func TestValidateSchema(t *testing.T) {
 			schema: DatabaseSchema{
 				Title: "X",
 				Properties: map[string]PropertySpec{
-					"Name": {Type: "title"},
-					"Owns": {Type: "relation"},
+					"Name":   {Type: "title"},
+					"Points": {Type: "rollup"},
 				},
 			},
 			want: "unsupported property types",
@@ -141,6 +141,28 @@ func TestValidateSchema(t *testing.T) {
 				},
 			},
 			want: "select properties without options",
+		},
+		{
+			name: "formula without expression",
+			schema: DatabaseSchema{
+				Title: "X",
+				Properties: map[string]PropertySpec{
+					"Name": {Type: "title"},
+					"Calc": {Type: "formula"},
+				},
+			},
+			want: "formula properties missing expression",
+		},
+		{
+			name: "relation without database id",
+			schema: DatabaseSchema{
+				Title: "X",
+				Properties: map[string]PropertySpec{
+					"Name":    {Type: "title"},
+					"Related": {Type: "relation"},
+				},
+			},
+			want: "relation properties missing relation_database_id",
 		},
 		{
 			name: "bad color",
