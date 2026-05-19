@@ -1,12 +1,13 @@
-ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-BIN  := $(ROOT)nodin
+ROOT    := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+BIN     := $(ROOT)nodin
+VERSION := $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 .PHONY: all build test test-integration test-e2e lint clean install help
 
 all: build
 
 build:
-	cd $(ROOT) && go build -o $(BIN) ./cmd/nodin
+	cd $(ROOT) && go build -ldflags "-X main.version=$(VERSION)" -o $(BIN) ./cmd/nodin
 
 test:
 	cd $(ROOT) && go test ./...
@@ -32,7 +33,7 @@ clean:
 	rm -f $(BIN)
 
 install:
-	cd $(ROOT) && go install ./cmd/nodin
+	cd $(ROOT) && go install -ldflags "-X main.version=$(VERSION)" ./cmd/nodin
 
 help:
 	@echo "build            build the nodin binary"

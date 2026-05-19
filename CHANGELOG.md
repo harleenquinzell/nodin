@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-19
+
 ### Added
 - `new-db` command: interactive creation of Notion databases with schema prompts
 - `formula` and `relation` property types for `new-db` schemas
@@ -15,5 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Push creates pages in Notion if they don't exist locally yet
 - Toggle / callout block support in pull
 - Index is read once per pull/push instead of repeatedly
+- `update` command: checks latest version and runs `go install` to self-update
+- Pull now removes local files for pages moved or deleted in Notion
 
-[Unreleased]: https://github.com/harleenquinzell/nodin/compare/HEAD...HEAD
+### Fixed
+- Database entries with a title column named something other than "Name" could not be created
+
+[Unreleased]: https://github.com/harleenquinzell/nodin/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/harleenquinzell/nodin/releases/tag/v0.1.0
