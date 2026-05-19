@@ -218,7 +218,7 @@ func createNewPage(
 	case "database_id":
 		titleProp := titlePropertyName(parent.schema)
 		if titleProp == "" {
-			return "", fmt.Errorf("database %s has no title property in schema", parent.parentID)
+			return "", fmt.Errorf("database %s has no title property in schema; run 'nodin pull' to refresh it", parent.parentID)
 		}
 		props, err := convert.YAMLToProperties(fm.Properties, fm.Computed, parent.schema)
 		if err != nil {

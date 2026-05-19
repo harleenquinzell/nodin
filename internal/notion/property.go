@@ -317,15 +317,14 @@ func (d *Database) TitleText() string {
 	return richTextPlain(d.Title)
 }
 
-// Schema returns a map from property name → Notion property type ("select", "number", …).
-// The "title" property is omitted since it is handled separately as the page title.
+// Schema returns a map from property name → Notion property type ("title", "select", "number", …).
 func (d *Database) Schema() map[string]string {
 	schema := make(map[string]string, len(d.Properties))
 	for name, raw := range d.Properties {
 		var envelope struct {
 			Type string `json:"type"`
 		}
-		if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Type != "title" {
+		if err := json.Unmarshal(raw, &envelope); err == nil {
 			schema[name] = envelope.Type
 		}
 	}
