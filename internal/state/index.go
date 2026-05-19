@@ -50,6 +50,19 @@ func (s *Store) WriteIndex(idx map[string]IndexEntry) error {
 	return writeFile(s.indexPath(), data, 0644)
 }
 
+// DeleteEntry removes a single entry from the index under the mutex.
+func (s *Store) DeleteEntry(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	idx, err := s.ReadIndex()
+	if err != nil {
+		return fmt.Errorf("delete entry %s: %w", id, err)
+	}
+	delete(idx, id)
+	return s.WriteIndex(idx)
+}
+
 // UpdateEntry performs a read-modify-write on a single index entry under the mutex.
 // fn receives the current entry (zero-value if absent) and returns the updated entry.
 func (s *Store) UpdateEntry(id string, fn func(IndexEntry) IndexEntry) error {

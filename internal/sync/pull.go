@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -43,12 +44,13 @@ type PullReport struct {
 	Pulled    int
 	Updated   int
 	Conflicts int
+	Removed   int
 	Pages     []string
 }
 
 // Summary returns a one-line summary string.
 func (r *PullReport) Summary() string {
-	return fmt.Sprintf("%d pulled, %d updated, %d conflicts", r.Pulled, r.Updated, r.Conflicts)
+	return fmt.Sprintf("%d pulled, %d updated, %d conflicts, %d removed", r.Pulled, r.Updated, r.Conflicts, r.Removed)
 }
 
 // Pull fetches pages updated since the last sync and writes them to disk.
@@ -186,6 +188,45 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 
 	if err := g.Wait(); err != nil {
 		return report, err
+	}
+
+	// Prune local files for pages that have been removed or moved out of scope.
+	// Skip for single-page fetches — we only saw one page, can't infer removals.
+	if pullOpts.PageID == "" {
+		returnedIDs := make(map[string]bool, len(pages))
+		for _, p := range pages {
+			returnedIDs[p.ID] = true
+		}
+		isFullPull := st.LastSync.IsZero() && pullOpts.Since.IsZero()
+		currentIdx, idxErr := store.ReadIndex()
+		if idxErr == nil {
+			for id, entry := range currentIdx {
+				if entry.Type != "page" || returnedIDs[id] {
+					continue
+				}
+				shouldPrune := false
+				if isFullPull {
+					// Full pull returned every accessible page — this one is gone.
+					shouldPrune = true
+				} else {
+					// Incremental: verify directly with the API.
+					p, err := client.GetPage(ctx, id)
+					if errors.Is(err, notion.ErrNotFound) || (err == nil && p.Archived) {
+						shouldPrune = true
+					}
+				}
+				if !shouldPrune {
+					continue
+				}
+				_ = os.Remove(filepath.Join(cfg.SyncDir, entry.LocalPath))
+				_ = store.DeleteSnapshot(id)
+				if store.DeleteEntry(id) == nil {
+					report.mu.Lock()
+					report.Removed++
+					report.mu.Unlock()
+				}
+			}
+		}
 	}
 
 	// Update LastSync to the minimum LastEditedTime in this batch to avoid skew.
