@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+
+# Format check — always available
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+    echo "pre-push: unformatted files (run gofmt -w .):"
+    echo "$unformatted"
+    exit 1
+fi
+
+# Lint — skip gracefully if not installed
+if command -v golangci-lint >/dev/null 2>&1; then
+    golangci-lint run ./...
+else
+    echo "pre-push: golangci-lint not found, skipping lint (see https://golangci-lint.run/welcome/install/)"
+fi

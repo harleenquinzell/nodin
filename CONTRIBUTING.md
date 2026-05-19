@@ -17,6 +17,16 @@ looking for something to contribute.
 4. Verify `go test ./internal/convert/...` passes, including the round-trip invariant test
 5. Update the block coverage table in `docs/plan.md`
 
+## Local checks
+
+Run this once after cloning to wire up the pre-push hook:
+
+```sh
+make hooks
+```
+
+After that, pushing will automatically run `gofmt` and `golangci-lint` before the push goes through — same checks as CI. If `golangci-lint` is not installed the lint step is skipped with a warning; install it from https://golangci-lint.run/welcome/install/.
+
 ## Running tests
 
 ```sh

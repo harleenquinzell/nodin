@@ -1,12 +1,15 @@
-ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-BIN  := $(ROOT)nodin
+ROOT    := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+BIN     := $(ROOT)nodin
+VERSION := $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-.PHONY: all build test test-integration test-e2e lint clean install help
+export PATH := /usr/local/go/bin:$(HOME)/go/bin:$(PATH)
+
+.PHONY: all build test test-integration test-e2e lint clean install hooks help
 
 all: build
 
 build:
-	cd $(ROOT) && go build -o $(BIN) ./cmd/nodin
+	cd $(ROOT) && go build -ldflags "-X main.version=$(VERSION)" -o $(BIN) ./cmd/nodin
 
 test:
 	cd $(ROOT) && go test ./...
@@ -26,13 +29,20 @@ lint:
 			echo "$$unformatted"; \
 			exit 1; \
 		fi
-	cd $(ROOT) && golangci-lint run ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		cd $(ROOT) && golangci-lint run ./...; \
+	else \
+		echo "golangci-lint not found, skipping (install from https://golangci-lint.run/welcome/install/)"; \
+	fi
 
 clean:
 	rm -f $(BIN)
 
+hooks:
+	git config core.hooksPath hooks
+
 install:
-	cd $(ROOT) && go install ./cmd/nodin
+	cd $(ROOT) && go install -ldflags "-X main.version=$(VERSION)" ./cmd/nodin
 
 help:
 	@echo "build            build the nodin binary"
@@ -41,4 +51,5 @@ help:
 	@echo "test-e2e         run end-to-end tests (sources .env for credentials)"
 	@echo "lint             run gofmt check + golangci-lint"
 	@echo "install          go install ./cmd/nodin"
+	@echo "hooks            configure git to use the hooks/ directory"
 	@echo "clean            remove the built binary"

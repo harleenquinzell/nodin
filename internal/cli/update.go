@@ -73,7 +73,7 @@ func fetchLatestVersion(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var info struct {
 		Version string `json:"Version"`
