@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,33 +29,36 @@ type PushOptions struct {
 
 // PushReport summarises the results of a push.
 type PushReport struct {
-	mu               sync.Mutex
-	Pushed           int
-	Created          int
-	DatabasesCreated int
-	Skipped          int
-	Conflicts        int
-	Pages            []string
-	Databases        []string
-	ConflictedPaths  []string
+	mu                 sync.Mutex
+	Pushed             int
+	Created            int
+	Archived           int
+	DatabasesCreated   int
+	Skipped            int
+	Conflicts          int
+	RemoteDeleted      int
+	Pages              []string
+	Databases          []string
+	ArchivedPaths      []string
+	ConflictedPaths    []string
+	RemoteDeletedPaths []string
 }
 
 // Summary returns a one-line summary string.
 func (r *PushReport) Summary() string {
-	s := fmt.Sprintf("%d pushed, %d created, %d skipped, %d conflicts",
-		r.Pushed, r.Created, r.Skipped, r.Conflicts)
+	s := fmt.Sprintf("%d pushed, %d created, %d archived, %d skipped, %d conflicts",
+		r.Pushed, r.Created, r.Archived, r.Skipped, r.Conflicts)
 	if r.DatabasesCreated > 0 {
 		s += fmt.Sprintf(", %d databases created", r.DatabasesCreated)
+	}
+	if r.RemoteDeleted > 0 {
+		s += fmt.Sprintf(", %d skipped (deleted in Notion)", r.RemoteDeleted)
 	}
 	return s
 }
 
 // Push reads locally modified pages and uploads the changes to Notion.
 func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *notion.Client, pushOpts PushOptions) (*PushReport, error) {
-	if err := PreCommit(cfg.SyncDir, "push", cfg.AutoCommit); err != nil {
-		return nil, fmt.Errorf("pre-push commit: %w", err)
-	}
-
 	idx, err := store.ReadIndex()
 	if err != nil {
 		return nil, fmt.Errorf("read index: %w", err)
@@ -90,7 +94,16 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		absPath := filepath.Join(cfg.SyncDir, entry.LocalPath)
 		data, err := os.ReadFile(absPath)
 		if err != nil {
-			// File deleted locally; skip for now.
+			if !os.IsNotExist(err) {
+				continue
+			}
+			// File deleted locally; archive the page in Notion.
+			g.Go(func() error {
+				if err := archivePage(ctx, store, client, id, entry, report); err != nil {
+					return fmt.Errorf("archive page %s: %w", id, err)
+				}
+				return nil
+			})
 			continue
 		}
 
@@ -117,9 +130,10 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return report, err
-	}
+	// Capture but don't immediately return the push-loop error. New pages and
+	// databases are independent of existing-page updates, so we create them
+	// regardless. The loop error (if any) is returned after all other work.
+	pushLoopErr := g.Wait()
 
 	// Create new databases first so that any untracked .md files inside them
 	// have a parent to attach to in the pushNewPages step below.
@@ -139,11 +153,13 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		}
 	}
 
+	// Commit any local file changes (e.g. canonical rewrites from new page
+	// creation) even when some existing pages failed to push.
 	if err := PostCommit(cfg.SyncDir, "push", report.Summary(), cfg.AutoCommit); err != nil {
 		return report, fmt.Errorf("post-push commit: %w", err)
 	}
 
-	return report, nil
+	return report, pushLoopErr
 }
 
 // pushNewPages walks the sync directory for .md files that have no index entry
@@ -192,6 +208,31 @@ func pushNewPages(
 	return nil
 }
 
+func archivePage(
+	ctx context.Context,
+	store *state.Store,
+	client *notion.Client,
+	notionID string,
+	entry state.IndexEntry,
+	report *PushReport,
+) error {
+	err := client.ArchivePage(ctx, notionID)
+	if err != nil && !errors.Is(err, notion.ErrNotFound) {
+		return fmt.Errorf("archive page: %w", err)
+	}
+	if err := store.DeleteEntry(notionID); err != nil {
+		return fmt.Errorf("delete index entry: %w", err)
+	}
+	if err := store.DeleteSnapshot(notionID); err != nil {
+		return fmt.Errorf("delete snapshot: %w", err)
+	}
+	report.mu.Lock()
+	report.Archived++
+	report.ArchivedPaths = append(report.ArchivedPaths, entry.LocalPath)
+	report.mu.Unlock()
+	return nil
+}
+
 func pushPage(
 	ctx context.Context,
 	syncDir string,
@@ -218,11 +259,32 @@ func pushPage(
 	// matches the snapshot, so the only overhead is one extra GetBlocks call.
 	remotePage, err := client.GetPage(ctx, notionID)
 	if err != nil {
+		if errors.Is(err, notion.ErrNotFound) {
+			report.mu.Lock()
+			report.RemoteDeleted++
+			report.RemoteDeletedPaths = append(report.RemoteDeletedPaths, entry.LocalPath)
+			report.mu.Unlock()
+			return nil
+		}
 		return fmt.Errorf("get page: %w", err)
+	}
+	if remotePage.Archived {
+		report.mu.Lock()
+		report.RemoteDeleted++
+		report.RemoteDeletedPaths = append(report.RemoteDeletedPaths, entry.LocalPath)
+		report.mu.Unlock()
+		return nil
 	}
 
 	remoteBlocks, err := client.GetBlocks(ctx, notionID)
 	if err != nil {
+		if errors.Is(err, notion.ErrNotFound) {
+			report.mu.Lock()
+			report.RemoteDeleted++
+			report.RemoteDeletedPaths = append(report.RemoteDeletedPaths, entry.LocalPath)
+			report.mu.Unlock()
+			return nil
+		}
 		return fmt.Errorf("get remote blocks: %w", err)
 	}
 	converted, err := convert.PullPage(*remotePage, remoteBlocks, opts)

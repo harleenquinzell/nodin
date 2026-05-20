@@ -18,22 +18,22 @@ func printConflictHints(w io.Writer, paths []string, absPath func(string) string
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
 	}
-	fmt.Fprintln(w, "\nresolve conflicts:")
+	_, _ = fmt.Fprintln(w, "\nresolve conflicts:")
 	for _, p := range paths {
 		line := firstConflictLine(absPath(p))
 		if editor == "" {
 			if line > 0 {
-				fmt.Fprintf(w, "  %s  (line %d)\n", p, line)
+				_, _ = fmt.Fprintf(w, "  %s  (line %d)\n", p, line)
 			} else {
-				fmt.Fprintf(w, "  %s\n", p)
+				_, _ = fmt.Fprintf(w, "  %s\n", p)
 			}
 		} else if line > 0 {
-			fmt.Fprintf(w, "  %s +%d %s\n", editor, line, p)
+			_, _ = fmt.Fprintf(w, "  %s +%d %s\n", editor, line, p)
 		} else {
-			fmt.Fprintf(w, "  %s %s\n", editor, p)
+			_, _ = fmt.Fprintf(w, "  %s %s\n", editor, p)
 		}
 	}
-	fmt.Fprintln(w, "then run: nodin push")
+	_, _ = fmt.Fprintln(w, "then run: nodin push")
 }
 
 // firstConflictLine returns the 1-based line number of the first <<<<<<< marker,
@@ -43,7 +43,7 @@ func firstConflictLine(path string) int {
 	if err != nil {
 		return 0
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	s := bufio.NewScanner(f)
 	n := 0
 	for s.Scan() {

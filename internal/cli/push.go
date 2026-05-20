@@ -82,11 +82,12 @@ func newPushCmd() *cobra.Command {
 
 			pushOpts := internalsync.PushOptions{PageID: resolvedPage}
 			report, err := internalsync.Push(ctx, cfg, store, client, pushOpts)
+			if report != nil {
+				cmd.Printf("push: %s\n", report.Summary())
+			}
 			if err != nil {
 				return err
 			}
-
-			cmd.Printf("push: %s\n", report.Summary())
 			if report.Conflicts > 0 {
 				printConflictHints(cmd.OutOrStdout(), report.ConflictedPaths, func(p string) string {
 					return filepath.Join(cfg.SyncDir, p)
