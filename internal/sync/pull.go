@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -214,6 +215,14 @@ func Pull(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 					p, err := client.GetPage(ctx, id)
 					if errors.Is(err, notion.ErrNotFound) || (err == nil && p.Archived) {
 						shouldPrune = true
+					} else if err == nil {
+						// Page still exists and isn't archived — check that it's still
+						// within the configured root hierarchy. A page moved outside the
+						// root should be treated as gone from this sync's perspective.
+						inScope, _ := pageIsUnderRoot(ctx, client, p, cfg.RootPageID)
+						if !inScope {
+							shouldPrune = true
+						}
 					}
 				}
 				if !shouldPrune {
@@ -378,6 +387,56 @@ func pullPage(
 		notify(localPath)
 	}
 	return nil
+}
+
+// pageIsUnderRoot reports whether page is a descendant of rootPageID by walking
+// the parent chain. Returns true when rootPageID is empty (no scoping). On any
+// API error the result is false so the caller can choose not to prune.
+func pageIsUnderRoot(ctx context.Context, client *notion.Client, start *notion.Page, rootPageID string) (bool, error) {
+	if rootPageID == "" {
+		return true, nil
+	}
+	rootBare := strings.ReplaceAll(rootPageID, "-", "")
+
+	current := start
+	visited := make(map[string]bool)
+	for {
+		if strings.ReplaceAll(current.ID, "-", "") == rootBare {
+			return true, nil
+		}
+		parentID := current.Parent.ID()
+		if current.Parent.Type == "workspace" || parentID == "" {
+			return false, nil
+		}
+		parentBare := strings.ReplaceAll(parentID, "-", "")
+		if parentBare == rootBare {
+			return true, nil
+		}
+		if visited[parentBare] {
+			return false, nil
+		}
+		visited[parentBare] = true
+
+		if current.Parent.Type == "database_id" {
+			db, err := client.GetDatabase(ctx, parentID)
+			if errors.Is(err, notion.ErrNotFound) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			current = &notion.Page{ID: db.ID, Parent: db.Parent}
+		} else {
+			parent, err := client.GetPage(ctx, parentID)
+			if errors.Is(err, notion.ErrNotFound) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			current = parent
+		}
+	}
 }
 
 // writeJSONFile atomically writes v as indented JSON to path.
