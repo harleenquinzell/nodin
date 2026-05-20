@@ -336,8 +336,13 @@ func pushProperties(ctx context.Context, client *notion.Client, page *notion.Pag
 	return client.UpdatePageProperties(ctx, page.ID, props)
 }
 
+// maxBlocksPerAppend is the Notion API limit for a single AppendBlocks call.
+const maxBlocksPerAppend = 100
+
 // applyOps applies a blockdiff op slice to Notion in the correct order:
 // Deletes first (freeing IDs), then Updates (preserving IDs), then Inserts.
+// Consecutive inserts that share the same AfterID are batched into a single
+// AppendBlocks call (up to maxBlocksPerAppend at a time) to reduce API round-trips.
 func applyOps(ctx context.Context, client *notion.Client, parentID string, ops []blockdiff.Op) error {
 	for _, op := range ops {
 		if op.Kind == blockdiff.Delete {
@@ -353,12 +358,40 @@ func applyOps(ctx context.Context, client *notion.Client, parentID string, ops [
 			}
 		}
 	}
+
+	// Collect inserts in order, then batch consecutive ops sharing the same AfterID.
+	var inserts []blockdiff.Op
 	for _, op := range ops {
 		if op.Kind == blockdiff.Insert {
-			if _, err := client.AppendBlocks(ctx, parentID, []notion.Block{op.Block}, op.AfterID); err != nil {
-				return fmt.Errorf("insert block: %w", err)
+			inserts = append(inserts, op)
+		}
+	}
+	for i := 0; i < len(inserts); {
+		afterID := inserts[i].AfterID
+		j := i + 1
+		for j < len(inserts) && inserts[j].AfterID == afterID {
+			j++
+		}
+		// Send inserts[i:j] in chunks of maxBlocksPerAppend.
+		currentAfterID := afterID
+		for k := i; k < j; k += maxBlocksPerAppend {
+			end := k + maxBlocksPerAppend
+			if end > j {
+				end = j
+			}
+			batch := make([]notion.Block, end-k)
+			for n, op := range inserts[k:end] {
+				batch[n] = op.Block
+			}
+			created, err := client.AppendBlocks(ctx, parentID, batch, currentAfterID)
+			if err != nil {
+				return fmt.Errorf("insert blocks: %w", err)
+			}
+			if len(created) > 0 {
+				currentAfterID = created[len(created)-1].ID
 			}
 		}
+		i = j
 	}
 	return nil
 }
