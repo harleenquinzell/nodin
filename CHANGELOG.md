@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Conflict hints after `pull`, `push`, and `status`: when merge conflicts are present, each command now lists the conflicted files with a ready-to-run editor command (`$VISUAL`/`$EDITOR`) that jumps directly to the first conflict marker (e.g. `nvim +42 pages/my-page.md`)
+- `diff` shows the same hint at the top when the target file contains unresolved conflict markers
+
 ## [0.1.0] - 2026-05-19
 
 ### Added

@@ -45,7 +45,7 @@ func newPushCmd() *cobra.Command {
 					return fmt.Errorf("status: %w", err)
 				}
 				n := 0
-				conflicts := 0
+				var conflictedPaths []string
 				for _, e := range entries {
 					if resolvedPage != "" && e.NotionID != resolvedPage && e.LocalPath != resolvedPage {
 						continue
@@ -55,19 +55,19 @@ func newPushCmd() *cobra.Command {
 						cmd.Printf("  %s  %s\n", e.Status, e.LocalPath)
 						n++
 					case internalsync.FileConflicted:
-						cmd.Printf("  conflict  %s  (resolve markers first)\n", e.LocalPath)
-						conflicts++
+						cmd.Printf("C  %s\n", e.LocalPath)
+						conflictedPaths = append(conflictedPaths, e.LocalPath)
 					}
 				}
-				if n == 0 && conflicts == 0 {
+				if n == 0 && len(conflictedPaths) == 0 {
 					cmd.Println("dry-run: nothing to push")
 				} else {
 					if n > 0 {
 						cmd.Printf("dry-run: %d page(s) would be pushed\n", n)
 					}
-					if conflicts > 0 {
-						cmd.Printf("dry-run: %d page(s) have unresolved conflicts\n", conflicts)
-					}
+					printConflictHints(cmd.OutOrStdout(), conflictedPaths, func(p string) string {
+						return filepath.Join(cfg.SyncDir, p)
+					})
 				}
 				return nil
 			}
@@ -88,6 +88,9 @@ func newPushCmd() *cobra.Command {
 
 			cmd.Printf("push: %s\n", report.Summary())
 			if report.Conflicts > 0 {
+				printConflictHints(cmd.OutOrStdout(), report.ConflictedPaths, func(p string) string {
+					return filepath.Join(cfg.SyncDir, p)
+				})
 				return ErrConflicts
 			}
 			return nil

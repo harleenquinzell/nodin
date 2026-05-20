@@ -36,6 +36,7 @@ type PushReport struct {
 	Conflicts        int
 	Pages            []string
 	Databases        []string
+	ConflictedPaths  []string
 }
 
 // Summary returns a one-line summary string.
@@ -103,6 +104,7 @@ func Push(ctx context.Context, cfg *config.Config, store *state.Store, client *n
 		if strings.Contains(localContent, "<<<<<<<") {
 			report.mu.Lock()
 			report.Conflicts++
+			report.ConflictedPaths = append(report.ConflictedPaths, entry.LocalPath)
 			report.mu.Unlock()
 			continue
 		}
@@ -239,6 +241,7 @@ func pushPage(
 		}
 		report.mu.Lock()
 		report.Conflicts++
+		report.ConflictedPaths = append(report.ConflictedPaths, entry.LocalPath)
 		report.mu.Unlock()
 		return nil
 	} else {

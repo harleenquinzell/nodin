@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -70,6 +71,9 @@ func newPullCmd() *cobra.Command {
 
 			cmd.Printf("pull: %s\n", report.Summary())
 			if report.Conflicts > 0 {
+				printConflictHints(cmd.OutOrStdout(), report.ConflictedPaths, func(p string) string {
+					return filepath.Join(cfg.SyncDir, p)
+				})
 				return ErrConflicts
 			}
 			return nil

@@ -40,12 +40,13 @@ type PullOptions struct {
 
 // PullReport summarises the results of a pull.
 type PullReport struct {
-	mu        sync.Mutex
-	Pulled    int
-	Updated   int
-	Conflicts int
-	Removed   int
-	Pages     []string
+	mu              sync.Mutex
+	Pulled          int
+	Updated         int
+	Conflicts       int
+	Removed         int
+	Pages           []string
+	ConflictedPaths []string
 }
 
 // Summary returns a one-line summary string.
@@ -331,6 +332,7 @@ func pullPage(
 				if result.Conflicts {
 					report.mu.Lock()
 					report.Conflicts++
+					report.ConflictedPaths = append(report.ConflictedPaths, localPath)
 					report.mu.Unlock()
 				}
 			}

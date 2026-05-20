@@ -65,6 +65,14 @@ func newDiffCmd() *cobra.Command {
 
 			absPath := filepath.Join(cfg.SyncDir, relPath)
 
+			// If the file contains unresolved conflict markers, show a resolve hint.
+			if line := firstConflictLine(absPath); line > 0 {
+				printConflictHints(cmd.OutOrStdout(), []string{relPath}, func(p string) string {
+					return filepath.Join(cfg.SyncDir, p)
+				})
+				cmd.Println()
+			}
+
 			// Write snapshot to a temp file so we can diff it.
 			tmpFile, err := os.CreateTemp("", "nodin-snapshot-*")
 			if err != nil {
